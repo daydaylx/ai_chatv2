@@ -1,9 +1,3 @@
-/**
- * Vite/React Entry.
- * - Fix: createRoot(...).render(<App />) statt leerem Render-Call.
- * - Harte Prüfung auf #root für klare Fehlermeldungen.
- */
-
 import React from 'react';
 import ReactDOM from 'react-dom/client';
 import App from './App.tsx';

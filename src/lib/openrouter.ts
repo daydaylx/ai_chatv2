@@ -3,15 +3,12 @@
  * - Fix: gültiger Stringabschluss (vorher: fehlerhaftes `\";`).
  * - Defensive Defaults + klare Fehlermeldungen.
  */
-
 export const OPENROUTER_BASE_URL = 'https://openrouter.ai/api/v1'\;
 
 /** Liest den API-Key aus Vite-Env. Warnung statt Crash, damit Dev-Server startet. */
 function getApiKey(): string {
   const key = (import.meta as any)?.env?.VITE_OPENROUTER_API_KEY ?? '';
   if (!key) {
-    // Hinweis: Ohne Key schlagen Requests zur API fehl – Build/Dev bleibt aber lauffähig.
-    // Setze VITE_OPENROUTER_API_KEY in .env (siehe .env.example).
     console.warn('[openrouter] Kein VITE_OPENROUTER_API_KEY gesetzt.');
   }
   return String(key);
@@ -35,7 +32,6 @@ export async function openRouterFetch(
     ...(init.headers as Record<string, string> | undefined),
   };
 
-  // Authorization nur setzen, wenn Key vorhanden ist (sonst z. B. bei local mocks sauber)
   if (apiKey) headers['Authorization'] = `Bearer ${apiKey}`;
 
   const body =
@@ -49,16 +45,10 @@ export async function openRouterFetch(
 
   if (!resp.ok) {
     let text = '';
-    try {
-      text = await resp.text();
-    } catch {
-      /* ignore */
-    }
+    try { text = await resp.text(); } catch {}
     throw new Error(`OpenRouter-Fehler ${resp.status}: ${text || resp.statusText}`);
   }
-
   return resp;
 }
 
-/** Kompatibilität: falls anderswo ein Default-Export des Base-URL erwartet wurde. */
 export default OPENROUTER_BASE_URL;

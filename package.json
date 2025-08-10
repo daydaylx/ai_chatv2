@@ -2,35 +2,29 @@
   "name": "ai-chat-mobile-pwa",
   "version": "1.0.0",
   "private": true,
+  "description": "Mobile-first PWA für AI-Chat (Vite + React + TS).",
   "type": "module",
   "scripts": {
+    "start": "vite",
     "dev": "vite",
-    "build": "tsc -b && vite build",
+    "build": "vite build",
     "preview": "vite preview",
-    "typecheck": "tsc --noEmit",
-    "lint": "echo \"(Lint kann später ergänzt werden)\""
-  },
-  "dependencies": {
-    "dexie": "^4.0.11",
-    "react": "^18.3.1",
-    "react-dom": "^18.3.1"
-  },
-  "devDependencies": {
-    "@types/react": "^18.3.6",
-    "@types/react-dom": "^18.3.0",
-    "@vitejs/plugin-react": "^4.3.1",
-    "autoprefixer": "^10.4.21",
-    "sharp": "^0.34.3",
-    "typescript": "^5.5.4",
-    "vite": "^5.4.2",
-    "vite-plugin-pwa": "^0.20.5",
-    "workbox-core": "^7.3.0",
-    "workbox-expiration": "^7.3.0",
-    "workbox-precaching": "^7.3.0",
-    "workbox-routing": "^7.3.0",
-    "workbox-strategies": "^7.3.0"
+    "typecheck": "tsc --noEmit"
   },
   "engines": {
     "node": "22.x"
+  },
+  "dependencies": {
+    "react": "^18.3.1",
+    "react-dom": "^18.3.1",
+    "workbox-window": "^7.1.0"
+  },
+  "devDependencies": {
+    "@types/react": "^18.3.5",
+    "@types/react-dom": "^18.3.0",
+    "@vitejs/plugin-react": "^4.3.1",
+    "typescript": "^5.6.2",
+    "vite": "^5.4.19",
+    "vite-plugin-pwa": "^0.20.5"
   }
 }

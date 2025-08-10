@@ -35,10 +35,22 @@ jobs:
         with:
           node-version: '20'
           cache: 'npm'
+
+      - name: Validate Vercel env
+        shell: bash
+        run: |
+          set -eu
+          [ -n "${VERCEL_TOKEN:-}" ] || { echo "VERCEL_TOKEN fehlt"; exit 1; }
+          [ -n "${VERCEL_ORG_ID:-}" ] || { echo "VERCEL_ORG_ID fehlt"; exit 1; }
+          [ -n "${VERCEL_PROJECT_ID:-}" ] || { echo "VERCEL_PROJECT_ID fehlt"; exit 1; }
+
       - run: npm ci
-      - name: Vercel pull (prod)
-        run: npx --yes vercel@latest pull --yes --environment=production
-      - name: Vercel build (prebuilt)
-        run: npx --yes vercel@latest build --prod
-      - name: Vercel deploy (prebuilt)
-        run: npx --yes vercel@latest deploy --prebuilt --prod
+
+      - name: vercel pull (prod)
+        run: npx --yes vercel@latest pull --yes --environment=production --token "$VERCEL_TOKEN"
+
+      - name: vercel build (prebuilt)
+        run: npx --yes vercel@latest build --prod --token "$VERCEL_TOKEN"
+
+      - name: vercel deploy (prebuilt to prod)
+        run: npx --yes vercel@latest deploy --prebuilt --prod --token "$VERCEL_TOKEN"

@@ -1,3 +1,4 @@
+import type { Theme } from "../../lib/theme";
 import { THEMES, type ThemeId } from "../../lib/theme";
 
 type Props = {
@@ -17,7 +18,7 @@ export default function ThemePicker({ visible, currentId, onPick, onClose }: Pro
           <button className="btn" onClick={onClose} aria-label="Schließen">Schließen</button>
         </div>
         <div className="sheet__body list">
-          {THEMES.map(t => {
+          {Object.values(THEMES).map((t: Theme) =>(t => {
             const active = t.id === currentId;
             return (
               <button
@@ -35,7 +36,7 @@ export default function ThemePicker({ visible, currentId, onPick, onClose }: Pro
                 </div>
               </button>
             );
-          })}
+          ))}
         </div>
       </div>
     </div>

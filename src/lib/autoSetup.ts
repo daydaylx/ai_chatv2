@@ -191,7 +191,7 @@ export function getRecommendedModelForPreset(preset: PersonaPreset): string | nu
   
   // 2. Erstes kompatibles Modell (falls keine Wildcard)
   if (preset.compatibleModels.length > 0 && preset.compatibleModels[0] !== "*") {
-    return preset.compatibleModels;
+    return preset.compatibleModels[0] || null;
   }
   
   return null;

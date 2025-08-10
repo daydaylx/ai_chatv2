@@ -8,7 +8,7 @@ echo "==================================="
 
 # 1. Security Check
 echo "🔒 Security Check..."
-if grep -r "sk-or-" . --exclude-dir=node_modules --exclude-dir=.git 2>/dev/null; then
+if grep -RInE "sk-or-[A-Za-z0-9_-]{20,}" . --exclude-dir=node_modules --exclude-dir=.git 2>/dev/null; then
     echo "❌ FEHLER: API-Keys im Code gefunden!"
     echo "   Entferne diese SOFORT und deaktiviere die Keys!"
     exit 1

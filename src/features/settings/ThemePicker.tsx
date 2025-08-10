@@ -1,41 +1,40 @@
-import type { Theme } from "../../lib/theme";
-import { THEMES, type ThemeId } from "../../lib/theme";
+import React from "react";
+import { THEMES, applyTheme, type ThemeId, type Theme } from "../../lib/theme";
 
 type Props = {
   visible: boolean;
-  currentId: ThemeId;
-  onPick: (id: ThemeId) => void;
+  value?: ThemeId;
+  onChange?: (id: ThemeId) => void;
   onClose: () => void;
 };
 
-export default function ThemePicker({ visible, currentId, onPick, onClose }: Props) {
+export default function ThemePicker({ visible, value, onChange, onClose }: Props) {
   if (!visible) return null;
+
+  const items: Theme[] = Object.values(THEMES);
+
   return (
-    <div className="sheet" role="dialog" aria-modal="true">
-      <div className="sheet__panel">
-        <div className="sheet__header">
-          <strong>Theme</strong>
-          <button className="btn" onClick={onClose} aria-label="Schließen">Schließen</button>
+    <div className="modal-overlay" onClick={onClose} role="dialog" aria-modal="true">
+      <div className="modal-content" onClick={(e) => e.stopPropagation()}>
+        <div className="modal-header">
+          <h2>🎨 Theme wählen</h2>
+          <button className="modal-close-btn" onClick={onClose} aria-label="Schließen">×</button>
         </div>
-        <div className="sheet__body list">
-          {Object.values(THEMES).map((t: Theme) =>(t => {
-            const active = t.id === currentId;
-            return (
-              <button
-                key={t.id}
-                className="list__item"
-                onClick={() => { onPick(t.id); onClose(); }}
-                aria-pressed={active}
-              >
-                <div className="list__title">
-                  {t.label} {active && <span style={{opacity:.7, fontWeight:400}}>(aktiv)</span>}
+
+        <div className="preset-list">
+          {items.map((t: Theme) => (
+            <button
+              key={t.id}
+              className={`model-item ${value === t.id ? "recommended" : ""}`}
+              onClick={() => { applyTheme(t.id); onChange?.(t.id); onClose(); }}
+            >
+              <div className="model-main">
+                <div className="model-name">{t.name}</div>
+                <div className="model-categories">
+                  <span className="model-category">{t.id}</span>
                 </div>
-                <div className="list__sub" style={{display:"flex", gap:8}}>
-                  <span style={{width:14, height:14, borderRadius:999, background:"var(--accent)"}} />
-                  <span style={{width:14, height:14, borderRadius:999, background:"var(--accent-2)"}} />
-                </div>
-              </button>
-            );
+              </div>
+            </button>
           ))}
         </div>
       </div>

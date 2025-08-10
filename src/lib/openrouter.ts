@@ -49,7 +49,7 @@ export class OpenRouterClient {
   }
 
   async listModels(): Promise<OpenRouterModel[]> {
-    const url = "https://openrouter.ai/api/v1/models"\;
+    const url = "https://openrouter.ai/api/v1/models";
     const res = await this._fetch(url, { method: "GET" });
     if (!res.ok) throw new Error(`Models fetch failed: ${res.status}`);
     const json = (await res.json()) as OpenRouterModelsResponse | any;
@@ -57,7 +57,7 @@ export class OpenRouterClient {
   }
 
   async listModelsCached(): Promise<OpenRouterModel[]> {
-    const url = "https://openrouter.ai/api/v1/models"\;
+    const url = "https://openrouter.ai/api/v1/models";
     const hit = this.getCached<OpenRouterModel[]>(url);
     if (hit) return hit;
     const list = await this.listModels();

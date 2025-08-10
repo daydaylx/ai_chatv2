@@ -1,0 +1,8 @@
+/*
+  Content-Security-Policy: default-src 'self'; img-src 'self' data:; style-src 'self' 'unsafe-inline'; script-src 'self'; connect-src 'self' https://openrouter.ai\; manifest-src 'self'; worker-src 'self'; frame-ancestors 'none'
+  Permissions-Policy: geolocation=(), microphone=(), camera=(), payment=(), interest-cohort=()
+  X-Content-Type-Options: nosniff
+  X-Frame-Options: DENY
+  Referrer-Policy: no-referrer
+  Cross-Origin-Opener-Policy: same-origin
+  Cross-Origin-Embedder-Policy: require-corp

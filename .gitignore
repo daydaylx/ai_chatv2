@@ -1,0 +1,23 @@
+# Node / Vite
+node_modules/
+dist/
+build/
+.vite/
+*.log
+
+# Local env & tooling
+.env
+.env.*
+*.local
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Hosting
+.vercel
+.netlify
+
+# IDE
+.vscode/
+.idea/

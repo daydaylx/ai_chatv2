@@ -1,0 +1,133 @@
+:root {
+  --bg: #0b0f14;
+  --panel: #0f141b;
+  --text: #e6edf3;
+  --muted: #a0aab6;
+  --accent: #1a73e8;
+  --danger: #d93025;
+  --kb-safe: 0px; /* dynamisch via visualViewport */
+}
+
+* { box-sizing: border-box; }
+
+html, body, #root {
+  height: 100%;
+}
+body {
+  margin: 0;
+  background: var(--bg);
+  color: var(--text);
+  font: 15px/1.45 system-ui, -apple-system, Segoe UI, Roboto, Ubuntu, Cantarell, "Helvetica Neue", Arial, "Noto Sans", "Apple Color Emoji", "Segoe UI Emoji";
+}
+
+.app {
+  min-height: 100dvh;
+  display: grid;
+  grid-template-rows: auto 1fr auto;
+}
+
+/* Topbar */
+.topbar {
+  position: sticky; top: 0; z-index: 10;
+  display: flex; align-items: center; justify-content: space-between;
+  gap: 8px; padding: 10px 12px;
+  background: rgba(15,20,27,0.9); backdrop-filter: blur(8px);
+  border-bottom: 1px solid #121823;
+}
+.topbar__right { display: flex; gap: 8px; align-items: center; }
+
+.keybtn, .btn {
+  height: 34px; padding: 0 10px; border-radius: 10px; border: 0;
+  font-weight: 600; color: #fff; background: var(--accent);
+}
+.keybtn.danger, .btn.danger { background: var(--danger); }
+
+.input, .file {
+  height: 38px; padding: 0 10px;
+  border-radius: 10px; border: 1px solid #1b2430; background: #0f141b; color: var(--text);
+}
+
+/* Banner */
+.banner {
+  padding: 10px 12px; font-size: 13px;
+  border-bottom: 1px solid #1a2330;
+}
+.banner.warn { background: #2a3a12; color: #dce8b8; }
+.banner.error { background: #402225; color: #f2c0c4; }
+
+/* Chat area */
+.chat {
+  padding: 12px; overflow: auto;
+  -webkit-overflow-scrolling: touch;
+}
+.empty { opacity: .7; text-align: center; margin-top: 20dvh; }
+.empty .hint { color: var(--muted); }
+
+/* Messages */
+.msg { display: flex; margin: 8px 0; }
+.msg--user { justify-content: flex-end; }
+.msg__bubble {
+  max-width: 86%;
+  padding: 10px 12px; border-radius: 16px;
+  background: #131a23; border: 1px solid #152030;
+  white-space: pre-wrap; word-wrap: break-word;
+}
+.msg--user .msg__bubble {
+  background: #143667; border-color: #154072;
+}
+
+/* Bottom bar */
+.bottombar {
+  position: sticky; bottom: 0; z-index: 15;
+  background: linear-gradient(180deg, rgba(11,15,20,0) 0%, rgba(11,15,20,1) 24%);
+  padding-bottom: max(8px, env(safe-area-inset-bottom));
+}
+.inputbar {
+  display: flex; gap: 8px; padding: 8px 12px;
+}
+.inputbar__textarea {
+  flex: 1; resize: none; min-height: 46px; max-height: 180px;
+  border-radius: 14px; border: 1px solid #1b2430; background: #0f141b; color: var(--text);
+  padding: 12px; outline: none;
+}
+.inputbar__textarea:disabled { opacity: .6; }
+.inputbar__btn {
+  min-width: 46px; height: 46px; border-radius: 14px; border: 0;
+  font-size: 18px; font-weight: 700; color: #fff; background: var(--accent);
+}
+.inputbar__btn.abort { background: var(--danger); }
+
+/* Bottom sheet / Overlay */
+.sheet {
+  position: fixed; inset: 0; z-index: 30;
+  background: rgba(0,0,0,0.5);
+  display: grid; place-items: end center;
+}
+.sheet__panel {
+  width: 100%; max-width: 720px;
+  background: var(--panel); border-top-left-radius: 16px; border-top-right-radius: 16px;
+  border: 1px solid #172030; padding: 12px;
+  box-shadow: 0 -10px 40px rgba(0,0,0,0.4);
+}
+.sheet__header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 10px; }
+.sheet__filters { display: grid; gap: 8px; margin-bottom: 8px; }
+.chips { display: flex; flex-wrap: wrap; gap: 12px; font-size: 13px; color: var(--muted); }
+.sheet__body { max-height: calc(100dvh - 180px); overflow: auto; padding: 2px; }
+.sheet__body.list { display: grid; gap: 6px; }
+.list__item {
+  text-align: left; width: 100%;
+  background: #0f141b; border: 1px solid #1b2430; color: var(--text);
+  padding: 10px; border-radius: 12px;
+}
+.list__title { font-weight: 700; font-size: 14px; }
+.list__sub { font-size: 12px; color: var(--muted); margin-top: 2px; }
+.group { margin: 10px 0; }
+.muted { color: var(--muted); font-size: 13px; }
+
+/* Keyboard safe area on mobile */
+@supports (height: 100dvh) {
+  .bottombar { padding-bottom: calc(max(8px, env(safe-area-inset-bottom)) + var(--kb-safe)); }
+}
+@media (prefers-reduced-motion: reduce) {
+  * { animation: none !important; transition: none !important; }
+}

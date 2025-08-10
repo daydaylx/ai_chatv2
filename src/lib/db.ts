@@ -1,146 +1,118 @@
-import Dexie, { Table } from "dexie";
+import Dexie, { Table } from 'dexie';
 
-export type Role = "system" | "user" | "assistant";
-
-export interface Session {
-  id: string;
-  title: string;
-  createdAt: number;
-}
-
-export interface Message {
-  id: string;
+export type Message = {
+  id?: number;
   sessionId: string;
-  role: Role;
+  role: 'system' | 'user' | 'assistant';
   content: string;
   createdAt: number;
-  tokens?: number;
-}
+};
 
-export interface SettingKV {
+export type Session = {
+  id?: string;            // string-UUID
+  title: string;
+  modelId?: string;
+  createdAt: number;
+  updatedAt: number;
+};
+
+export type Setting = {
   key: string;
-  value: unknown;
-}
+  value: string;
+};
 
-class AppDB extends Dexie {
+export class AppDB extends Dexie {
+  messages!: Table<Message, number>;
   sessions!: Table<Session, string>;
-  messages!: Table<Message, string>;
-  settings!: Table<SettingKV, string>;
+  settings!: Table<Setting, string>;
 
   constructor() {
-    super("aiChatPWA");
+    super('ai_chat_mobile_pwa');
     this.version(1).stores({
-      sessions: "id, createdAt",
-      messages: "id, sessionId, createdAt",
-      settings: "key"
+      messages: '++id, sessionId, createdAt',
+      sessions: '&id, updatedAt',
+      settings: '&key'
     });
   }
 }
 
 export const db = new AppDB();
 
-const CUR_SESSION_KEY = "currentSessionId";
-
-export async function ensureDefaultSession(): Promise<Session> {
-  const existingId = localStorage.getItem(CUR_SESSION_KEY);
-  if (existingId) {
-    const hit = await db.sessions.get(existingId);
-    if (hit) return hit;
-  }
-  const s: Session = { id: crypto.randomUUID(), title: "Privat", createdAt: Date.now() };
-  await db.sessions.add(s);
-  localStorage.setItem(CUR_SESSION_KEY, s.id);
-  return s;
+/** CRUD-Helfer (optional) */
+export async function addMessage(m: Message) {
+  return db.messages.add({ ...m, createdAt: m.createdAt ?? Date.now() });
+}
+export async function getSession(id: string) {
+  return db.sessions.get(id);
+}
+export async function putSession(s: Session) {
+  const now = Date.now();
+  return db.sessions.put({ ...s, updatedAt: now, createdAt: s.createdAt ?? now });
 }
 
-export async function getCurrentSession(): Promise<Session> {
-  const s = await ensureDefaultSession();
-  return s;
-}
-
-export async function setCurrentSession(id: string) {
-  const has = await db.sessions.get(id);
-  if (!has) throw new Error("Session nicht gefunden");
-  localStorage.setItem(CUR_SESSION_KEY, id);
-}
-
-export async function getMessages(sessionId: string): Promise<Message[]> {
-  return db.messages.where("sessionId").equals(sessionId).sortBy("createdAt");
-}
-
-export async function addMessage(m: Message): Promise<void> {
-  await db.messages.add(m);
-}
-
-export async function upsertAssistantMessage(
-  sessionId: string,
-  ref: { id?: string },
-  content: string
-): Promise<Message> {
-  if (!ref.id) {
-    const m: Message = {
-      id: crypto.randomUUID(),
-      sessionId,
-      role: "assistant",
-      content,
-      createdAt: Date.now()
-    };
-    await db.messages.add(m);
-    ref.id = m.id;
-    return m;
-  } else {
-    await db.messages.update(ref.id, { content });
-    const m = await db.messages.get(ref.id);
-    if (!m) throw new Error("Assistant-Message nicht gefunden");
-    return m;
-  }
-}
-
-export async function wipeAll(): Promise<void> {
-  await db.transaction("rw", db.messages, db.sessions, db.settings, async () => {
-    await db.messages.clear();
-    await db.sessions.clear();
-    await db.settings.clear();
-  });
-  localStorage.removeItem(CUR_SESSION_KEY);
-}
-
-export type BackupSchema = {
-  schema: 1;
-  exportedAt: string;
-  sessions: Session[];
+/** Backup/Restore-Formate */
+export type BackupPayload = {
+  version: 1;
+  exportedAt: number;
   messages: Message[];
-  settings: SettingKV[];
+  sessions: Session[];
+  settings: Setting[];
 };
 
-export async function exportBackup(): Promise<BackupSchema> {
-  const [sessions, messages, settings] = await Promise.all([
-    db.sessions.toArray(),
+/** Exportiert kompletten DB-Inhalt als Objekt (Backup.tsx stringifiziert selbst) */
+export async function exportBackup(): Promise<BackupPayload> {
+  const [messages, sessions, settings] = await Promise.all([
     db.messages.toArray(),
+    db.sessions.toArray(),
     db.settings.toArray()
   ]);
   return {
-    schema: 1,
-    exportedAt: new Date().toISOString(),
-    sessions,
+    version: 1,
+    exportedAt: Date.now(),
     messages,
+    sessions,
     settings
   };
 }
 
-export async function importBackup(data: unknown): Promise<void> {
-  const d = data as Partial<BackupSchema> | undefined;
-  if (!d || d.schema !== 1 || !Array.isArray(d.sessions) || !Array.isArray(d.messages) || !Array.isArray(d.settings)) {
-    throw new Error("Ungültiges Backup-Format (schema != 1)");
+/** Importiert JSON-Backup (als String oder Objekt) */
+export async function importBackup(input: string | BackupPayload): Promise<void> {
+  const payload: BackupPayload = typeof input === 'string' ? JSON.parse(input) : input;
+  if (!payload || payload.version !== 1) {
+    throw new Error('Ungültiges Backup-Format oder Version.');
   }
-  await db.transaction("rw", db.sessions, db.messages, db.settings, async () => {
-    await db.sessions.clear();
+  const ensureId = (s: Session): Session => {
+    let id = s.id;
+    if (!id) {
+      const r = (globalThis as any)?.crypto?.randomUUID?.() ?? `${Date.now()}-${Math.random()}`;
+      id = String(r);
+    }
+    return { ...s, id };
+  };
+
+  await db.transaction('rw', db.messages, db.sessions, db.settings, async () => {
     await db.messages.clear();
+    await db.sessions.clear();
     await db.settings.clear();
-    await db.sessions.bulkAdd(d.sessions!);
-    await db.messages.bulkAdd(d.messages!);
-    await db.settings.bulkAdd(d.settings!);
+
+    if (payload.sessions?.length) {
+      await db.sessions.bulkAdd(payload.sessions.map(ensureId));
+    }
+    if (payload.messages?.length) {
+      const msgs = payload.messages.map(m => ({ ...m, createdAt: m.createdAt ?? Date.now() }));
+      await db.messages.bulkAdd(msgs);
+    }
+    if (payload.settings?.length) {
+      await db.settings.bulkPut(payload.settings);
+    }
   });
-  const first = d.sessions![0];
-  if (first?.id) localStorage.setItem(CUR_SESSION_KEY, first.id);
+}
+
+/** Löscht alle Daten */
+export async function wipeAll(): Promise<void> {
+  await db.transaction('rw', db.messages, db.sessions, db.settings, async () => {
+    await db.messages.clear();
+    await db.sessions.clear();
+    await db.settings.clear();
+  });
 }

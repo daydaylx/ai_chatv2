@@ -1,7 +1,4 @@
-* text=auto eol=lf
-*.png binary
-*.jpg binary
-*.jpeg binary
-*.webp binary
-*.ico binary
-*.pdf binary
+*.ts text eol=lf
+*.tsx text eol=lf
+*.js text eol=lf
+*.css text eol=lf

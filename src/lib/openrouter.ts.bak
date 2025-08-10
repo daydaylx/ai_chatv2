@@ -1,10 +1,10 @@
 /**
  * OpenRouter API – Browser/Vite-Client ohne externe Deps.
- * - Korrekte Syntax (kein Backslash vorm Semikolon)
+ * - Korrekte Syntax
  * - Named Exports: OpenRouterClient, OpenRouterModel, ChatMessage
  * - Fallback-Key: localStorage('openrouter_api_key') -> import.meta.env.VITE_OPENROUTER_API_KEY
  */
-export const OPENROUTER_BASE_URL = 'https://openrouter.ai/api/v1';
+export const OPENROUTER_BASE_URL = 'https://openrouter.ai/api/v1'\;
 
 export type ChatMessage = { role: 'system' | 'user' | 'assistant'; content: string };
 
@@ -32,12 +32,12 @@ export class OpenRouterError extends Error {
 }
 
 function getEnvKey(): string {
-  const env: any = (import.meta as any)?.env || {};
-  return String(env.VITE_OPENROUTER_API_KEY || '');
+  const env: any = (import.meta as any)?.env ?? {};
+  return String(env.VITE_OPENROUTER_API_KEY ?? '');
 }
 
 function buildUrl(path: string): string {
-  return `${OPENROUTER_BASE_URL}/${String(path).replace(/^/k/, '')}`;
+  return `${OPENROUTER_BASE_URL}/${String(path).replace(/^\/+/, '')}`;
 }
 
 function normalizeHeaders(h?: HeadersInit): Record<string, string> {
@@ -52,7 +52,7 @@ function normalizeHeaders(h?: HeadersInit): Record<string, string> {
     for (const [k, v] of h) o[String(k)] = String(v);
     return o;
   }
-  return { ..(h as Record<string, string>) };
+  return { ...(h as Record<string, string>) };
 }
 
 type JsonInit = Omit<RequestInit, 'body'> & { body?: unknown };
@@ -85,7 +85,7 @@ export async function openRouterFetch(path: string, init: JsonInit = {}): Promis
     try {
       const ct = resp.headers.get('content-type') || '';
       details = ct.includes('application/json') ? await resp.json() : await resp.text();
-    } catch { /* no-op */ }
+    } catch { /* ignore */ }
     const msg =
       typeof details === 'string'
         ? details
@@ -96,12 +96,12 @@ export async function openRouterFetch(path: string, init: JsonInit = {}): Promis
   return resp;
 }
 
-export async function openRouterJsonT<T>(path: string, init: JsonInit = {}): Promise<T> {
+export async function openRouterJson<T>(path: string, init: JsonInit = {}): Promise<T> {
   const r = await openRouterFetch(path, init);
   const ct = r.headers.get('content-type') || '';
   if (!ct.includes('application/json')) {
     const text = await r.text().catch(() => '');
-    throw new OpenRouterError('Unerwartetes Response-Format (JSON ewartet).', p.status, r.statusText, text);
+    throw new OpenRouterError('Unerwartetes Response-Format (JSON erwartet).', r.status, r.statusText, text);
   }
   return (await r.json()) as T;
 }

@@ -1,10 +1,10 @@
 /**
  * OpenRouter API – Browser/Vite-Client ohne externe Deps.
- * - Korrekte Syntax (kein Backslash vorm Semikolon)
+ * - Korrekte Syntax
  * - Named Exports: OpenRouterClient, OpenRouterModel, ChatMessage
  * - Fallback-Key: localStorage('openrouter_api_key') -> import.meta.env.VITE_OPENROUTER_API_KEY
  */
-export const OPENROUTER_BASE_URL = 'https://openrouter.ai/api/v1';
+export const OPENROUTER_BASE_URL = 'https://openrouter.ai/api/v1'
 
 export type ChatMessage = { role: 'system' | 'user' | 'assistant'; content: string };
 
@@ -14,6 +14,8 @@ export type OpenRouterModel = {
   context_length?: number;
   input_price?: number;
   output_price?: number;
+  pricing?: any;
+  price?: any;
 };
 
 const LS_KEY = 'openrouter_api_key';
@@ -37,7 +39,7 @@ function getEnvKey(): string {
 }
 
 function buildUrl(path: string): string {
-  return `${OPENROUTER_BASE_URL}/${String(path).replace(/^/k/, '')}`;
+  return `${OPENROUTER_BASE_URL}/${String(path).replace(/^\//, '')}`;
 }
 
 function normalizeHeaders(h?: HeadersInit): Record<string, string> {
@@ -52,7 +54,7 @@ function normalizeHeaders(h?: HeadersInit): Record<string, string> {
     for (const [k, v] of h) o[String(k)] = String(v);
     return o;
   }
-  return { ..(h as Record<string, string>) };
+  return { ...(h as Record<string, string>) };
 }
 
 type JsonInit = Omit<RequestInit, 'body'> & { body?: unknown };
@@ -96,12 +98,12 @@ export async function openRouterFetch(path: string, init: JsonInit = {}): Promis
   return resp;
 }
 
-export async function openRouterJsonT<T>(path: string, init: JsonInit = {}): Promise<T> {
+export async function openRouterJson<T>(path: string, init: JsonInit = {}): Promise<T> {
   const r = await openRouterFetch(path, init);
   const ct = r.headers.get('content-type') || '';
   if (!ct.includes('application/json')) {
     const text = await r.text().catch(() => '');
-    throw new OpenRouterError('Unerwartetes Response-Format (JSON ewartet).', p.status, r.statusText, text);
+    throw new OpenRouterError('Unerwartetes Response-Format (JSON erwartet).', r.status, r.statusText, text);
   }
   return (await r.json()) as T;
 }
@@ -110,9 +112,11 @@ export class OpenRouterClient {
   getApiKey(): string {
     return localStorage.getItem(LS_KEY) || getEnvKey() || '';
   }
+  
   setApiKey(key: string) {
     if (key) localStorage.setItem(LS_KEY, key);
   }
+  
   clearApiKey() {
     localStorage.removeItem(LS_KEY);
   }
@@ -122,7 +126,12 @@ export class OpenRouterClient {
     return (data?.data ?? []).filter(m => !!m.id);
   }
 
-  async chat(opts: { model: string; messages: ChatMessage[]; temperature?: number; max_tokens?: number; }): Promise<{ content: string }> {
+  async chat(opts: { 
+    model: string; 
+    messages: ChatMessage[]; 
+    temperature?: number; 
+    max_tokens?: number; 
+  }): Promise<{ content: string }> {
     const res = await openRouterJson<any>('chat/completions', {
       method: 'POST',
       body: {
@@ -137,4 +146,4 @@ export class OpenRouterClient {
   }
 }
 
-export default OPENROUTER_BASE_URL;
+export default OpenRouterClient;

@@ -1,19 +1,44 @@
-name: deploy
+name: deploy-vercel
+
 on:
   push:
     branches: [ "main" ]
+
+concurrency:
+  group: deploy-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
-  verify:
+  build:
     runs-on: ubuntu-latest
+    timeout-minutes: 12
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
-        with: { node-version: '20', cache: 'npm' }
+        with:
+          node-version: '20'
+          cache: 'npm'
       - run: npm ci
       - run: npm run build
-  trigger-vercel:
-    needs: verify
+
+  deploy:
+    needs: build
     runs-on: ubuntu-latest
+    timeout-minutes: 15
+    env:
+      VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
+      VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
+      VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID }}
     steps:
-      - name: Trigger Vercel Deploy Hook
-        run: curl -s -X POST "${{ secrets.VERCEL_DEPLOY_HOOK }}"
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+      - run: npm ci
+      - name: Vercel pull (prod)
+        run: npx --yes vercel@latest pull --yes --environment=production
+      - name: Vercel build (prebuilt)
+        run: npx --yes vercel@latest build --prod
+      - name: Vercel deploy (prebuilt)
+        run: npx --yes vercel@latest deploy --prebuilt --prod

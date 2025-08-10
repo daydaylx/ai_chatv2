@@ -1,5 +1,4 @@
 name: deploy-vercel
-
 on:
   push:
     branches: [ "main" ]
@@ -15,9 +14,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
-        with:
-          node-version: '20'
-          cache: 'npm'
+        with: { node-version: '20', cache: 'npm' }
       - run: npm ci
       - run: npm run build
 
@@ -32,9 +29,8 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
-        with:
-          node-version: '20'
-          cache: 'npm'
+        with: { node-version: '20', cache: 'npm' }
+      - run: npm ci
 
       - name: Validate Vercel env
         shell: bash
@@ -44,13 +40,14 @@ jobs:
           [ -n "${VERCEL_ORG_ID:-}" ] || { echo "VERCEL_ORG_ID fehlt"; exit 1; }
           [ -n "${VERCEL_PROJECT_ID:-}" ] || { echo "VERCEL_PROJECT_ID fehlt"; exit 1; }
 
-      - run: npm ci
-
       - name: vercel pull (prod)
-        run: npx --yes vercel@latest pull --yes --environment=production --token "$VERCEL_TOKEN"
+        run: npx --yes vercel@latest pull --yes --environment=production \
+               --token "$VERCEL_TOKEN" --project "$VERCEL_PROJECT_ID" --scope "$VERCEL_ORG_ID"
 
       - name: vercel build (prebuilt)
-        run: npx --yes vercel@latest build --prod --token "$VERCEL_TOKEN"
+        run: npx --yes vercel@latest build --prod \
+               --token "$VERCEL_TOKEN" --project "$VERCEL_PROJECT_ID" --scope "$VERCEL_ORG_ID"
 
       - name: vercel deploy (prebuilt to prod)
-        run: npx --yes vercel@latest deploy --prebuilt --prod --token "$VERCEL_TOKEN"
+        run: npx --yes vercel@latest deploy --prebuilt --prod \
+               --token "$VERCEL_TOKEN" --project "$VERCEL_PROJECT_ID" --scope "$VERCEL_ORG_ID"

@@ -32,8 +32,7 @@ jobs:
         with: { node-version: '20', cache: 'npm' }
       - run: npm ci
 
-      - name: Validate Vercel env
-        shell: bash
+      - name: Validate env
         run: |
           set -eu
           [ -n "${VERCEL_TOKEN:-}" ] || { echo "VERCEL_TOKEN fehlt"; exit 1; }

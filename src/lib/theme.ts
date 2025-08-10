@@ -1,79 +1,126 @@
-export type ThemeId = "neon" | "mint" | "sunset" | "grape" | "mono";
+export type ThemeId = "light" | "dark" | "red" | "blue" | "purple";
 
-type ThemeDef = {
+export type Theme = {
   id: ThemeId;
-  label: string;
+  name: string;
   vars: Record<string, string>;
 };
 
-const KEY = "ui_theme";
-
-export const THEMES: ThemeDef[] = [
-  {
-    id: "neon",
-    label: "Neon Blue",
+const THEMES: Record<ThemeId, Theme> = {
+  light: {
+    id: "light",
+    name: "Hell",
     vars: {
-      "--accent": "#1a73e8",
-      "--accent-2": "#4cc9f0",
-      "--bg-grad-1": "#0b0f14",
-      "--bg-grad-2": "#0a1220"
+      "--bg": "#f7f9fc",
+      "--bg-secondary": "#ffffff", 
+      "--fg": "#0b0f14",
+      "--text-secondary": "#6b7280",
+      "--accent": "#3b82f6",
+      "--accent-bg": "#dbeafe",
+      "--border-color": "#e5e7eb",
+      "--shadow": "rgba(0,0,0,0.1)"
     }
   },
-  {
-    id: "mint",
-    label: "Neo Mint",
+  dark: {
+    id: "dark", 
+    name: "Dunkel",
     vars: {
-      "--accent": "#1dd1a1",
-      "--accent-2": "#48dbfb",
-      "--bg-grad-1": "#071511",
-      "--bg-grad-2": "#041a17"
+      "--bg": "#0b0f14",
+      "--bg-secondary": "#1a1f2e",
+      "--fg": "#e6edf3", 
+      "--text-secondary": "#8b949e",
+      "--accent": "#8b5cf6",
+      "--accent-bg": "#2d1b69",
+      "--border-color": "#30363d",
+      "--shadow": "rgba(0,0,0,0.3)"
     }
   },
-  {
-    id: "sunset",
-    label: "Sunset",
+  red: {
+    id: "red",
+    name: "Rot (Adult)",
     vars: {
-      "--accent": "#f97316",
-      "--accent-2": "#f43f5e",
-      "--bg-grad-1": "#150c0b",
-      "--bg-grad-2": "#1e0f0a"
+      "--bg": "#120b0c",
+      "--bg-secondary": "#2d1314", 
+      "--fg": "#ffecec",
+      "--text-secondary": "#d1a3a4",
+      "--accent": "#ef4444",
+      "--accent-bg": "#7f1d1d",
+      "--border-color": "#44181c",
+      "--shadow": "rgba(239,68,68,0.2)"
     }
   },
-  {
-    id: "grape",
-    label: "Cyber Grape",
+  blue: {
+    id: "blue",
+    name: "Blau (Roleplay)",
     vars: {
-      "--accent": "#7c3aed",
-      "--accent-2": "#22d3ee",
-      "--bg-grad-1": "#0f0b14",
-      "--bg-grad-2": "#130a1e"
+      "--bg": "#0b1016", 
+      "--bg-secondary": "#1e293b",
+      "--fg": "#e5f0ff",
+      "--text-secondary": "#94a3b8",
+      "--accent": "#3b82f6",
+      "--accent-bg": "#1e40af", 
+      "--border-color": "#334155",
+      "--shadow": "rgba(59,130,246,0.2)"
     }
   },
-  {
-    id: "mono",
-    label: "Monochrome",
+  purple: {
+    id: "purple",
+    name: "Lila (Kreativ)",
     vars: {
-      "--accent": "#8b949e",
-      "--accent-2": "#c9d1d9",
-      "--bg-grad-1": "#0b0f14",
-      "--bg-grad-2": "#0b0f14"
+      "--bg": "#120f16",
+      "--bg-secondary": "#2d1b3d", 
+      "--fg": "#efe9ff",
+      "--text-secondary": "#c4b5fd",
+      "--accent": "#8b5cf6",
+      "--accent-bg": "#6d28d9",
+      "--border-color": "#4c1d95", 
+      "--shadow": "rgba(139,92,246,0.2)"
     }
   }
-];
+};
 
-export function getTheme(): ThemeDef {
-  const id = (localStorage.getItem(KEY) as ThemeId) || "neon";
-  return THEMES.find(t => t.id === id) || THEMES[0];
-}
-
-export function setTheme(id: ThemeId) {
-  const t = THEMES.find(x => x.id === id);
-  if (!t) return;
-  localStorage.setItem(KEY, t.id);
-  applyTheme(t);
-}
-
-export function applyTheme(t: ThemeDef = getTheme()) {
+export function applyTheme(themeId: ThemeId = "dark"): void {
+  const theme = THEMES[themeId];
+  if (!theme) {
+    console.warn(`Theme '${themeId}' not found, falling back to 'dark'`);
+    return applyTheme("dark");
+  }
+  
   const root = document.documentElement;
-  for (const [k, v] of Object.entries(t.vars)) root.style.setProperty(k, v);
+  root.setAttribute("data-theme", themeId);
+  
+  // CSS Custom Properties setzen
+  Object.entries(theme.vars).forEach(([property, value]) => {
+    root.style.setProperty(property, value);
+  });
+  
+  // Persistierung mit Error-Handling
+  try {
+    localStorage.setItem("theme", themeId);
+  } catch (error) {
+    console.warn("Failed to persist theme:", error);
+  }
 }
+
+export function getTheme(): Theme {
+  try {
+    const stored = localStorage.getItem("theme") as ThemeId;
+    if (stored && THEMES[stored]) {
+      return THEMES[stored];
+    }
+  } catch (error) {
+    console.warn("Failed to load theme from storage:", error);
+  }
+  
+  return THEMES.dark; // Produktionssicherer Default
+}
+
+export function setTheme(themeId: ThemeId): void {
+  applyTheme(themeId);
+}
+
+export function getAllThemes(): Theme[] {
+  return Object.values(THEMES);
+}
+
+export { THEMES };

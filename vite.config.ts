@@ -9,14 +9,13 @@ export default defineConfig({
       registerType: "autoUpdate",
       injectRegister: "auto",
       srcDir: "src",
-      filename: "sw.ts",
+      filename: "sw.js",         // <-- JS statt TS
       strategies: "injectManifest",
       manifest: false,
       devOptions: { enabled: true }
     })
   ],
   css: {
-    // erzwingt lokale PostCSS-Config und verhindert Lookup bis $HOME
     postcss: "./postcss.config.cjs"
   },
   server: { host: true, port: 5173 },

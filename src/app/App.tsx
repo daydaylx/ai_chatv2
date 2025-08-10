@@ -1,7 +1,8 @@
+export type ChatMessage = { role: "system" | "user" | "assistant"; content: string };
 import { useEffect, useMemo, useRef, useState } from "react";
 import InputBar from "../features/chat/InputBar";
 import { ErrorBoundary } from "./ErrorBoundary";
-import { OpenRouterClient, type ChatMessage } from "../lib/openrouter";
+import { OpenRouterClient } from "../lib/openrouter";
 import { getApiKey, setApiKey, clearApiKey } from "../lib/storage";
 import { getCurrentSession, getMessages as dbGetMessages, addMessage as dbAddMessage, upsertAssistantMessage } from "../lib/db";
 import ModelPicker from "../features/models/ModelPicker";
@@ -70,7 +71,7 @@ function App() {
 
   const client = useMemo(() => {
     if (!apiKey) return null;
-    try { return new OpenRouterClient(apiKey, { timeoutMs: 45000, maxRetries: 2 }); }
+    try { return new OpenRouterClient({ apiKey, timeoutMs: 45000, maxRetries: 2 }); }
     catch { return null; }
   }, [apiKey]);
 
@@ -203,7 +204,7 @@ function App() {
         <ModelPicker
           visible={showModels}
           onClose={() => setShowModels(false)}
-          onPick={(id) => setModel(id)}
+          onChange={(id) => setModel(id)}
           client={client}
         />
       )}
@@ -211,14 +212,14 @@ function App() {
       <PersonaPicker
         visible={showPersona}
         currentId={persona.id}
-        onPick={setPersonaById}
+        onChange={setPersonaById}
         onClose={() => setShowPersona(false)}
       />
 
       <ThemePicker
         visible={showTheme}
-        currentId={themeId}
-        onPick={setThemeById}
+        value={themeId}
+        onChange={setThemeById}
         onClose={() => setShowTheme(false)}
       />
 

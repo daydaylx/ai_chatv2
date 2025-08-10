@@ -1,17 +1,16 @@
-import React from "react";
-import { THEMES, applyTheme, type ThemeId, type Theme } from "../../lib/theme";
+import type { Theme, ThemeId } from "../../lib/theme";
+import { THEMES } from "../../lib/theme";
 
 type Props = {
   visible: boolean;
-  value?: ThemeId;
-  onChange?: (id: ThemeId) => void;
+  value: ThemeId;
+  onChange: (id: ThemeId) => void;
   onClose: () => void;
 };
 
 export default function ThemePicker({ visible, value, onChange, onClose }: Props) {
   if (!visible) return null;
-
-  const items: Theme[] = Object.values(THEMES);
+  const themes: Theme[] = Object.values(THEMES);
 
   return (
     <div className="modal-overlay" onClick={onClose} role="dialog" aria-modal="true">
@@ -22,11 +21,12 @@ export default function ThemePicker({ visible, value, onChange, onClose }: Props
         </div>
 
         <div className="preset-list">
-          {items.map((t: Theme) => (
+          {themes.map((t: Theme) => (
             <button
               key={t.id}
-              className={`model-item ${value === t.id ? "recommended" : ""}`}
-              onClick={() => { applyTheme(t.id); onChange?.(t.id); onClose(); }}
+              className={`model-item ${t.id === value ? "recommended" : ""}`}
+              onClick={() => onChange(t.id)}
+              title={t.name}
             >
               <div className="model-main">
                 <div className="model-name">{t.name}</div>

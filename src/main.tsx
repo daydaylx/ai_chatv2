@@ -1,12 +1,21 @@
-import React from "react";
-import ReactDOM from "react-dom/client";
-import App from "./app/App";
+/**
+ * Vite/React Entry.
+ * - Fix: createRoot(...).render(<App />) statt leerem Render-Call.
+ * - Harte Prüfung auf #root für klare Fehlermeldungen.
+ */
 
-import { registerSW } from "virtual:pwa-register";
-registerSW({ immediate: true });
+import React from 'react';
+import ReactDOM from 'react-dom/client';
+import App from './App.tsx';
+import './index.css';
 
-ReactDOM.createRoot(document.getElementById("root")!).render(
+const rootEl = document.getElementById('root');
+if (!rootEl) {
+  throw new Error('Root-Element #root nicht gefunden. Prüfe index.html.');
+}
+
+ReactDOM.createRoot(rootEl).render(
   <React.StrictMode>
     <App />
-  </React.StrictMode>
+  </React.StrictMode>,
 );

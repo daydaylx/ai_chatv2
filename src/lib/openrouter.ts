@@ -1,149 +1,64 @@
-export type FetchFn = typeof fetch;
+/**
+ * OpenRouter API-Konstanten & Helper.
+ * - Fix: gültiger Stringabschluss (vorher: fehlerhaftes `\";`).
+ * - Defensive Defaults + klare Fehlermeldungen.
+ */
 
-export interface ChatMessage {
-  role: "system" | "user" | "assistant" | "tool";
-  content: string;
-  name?: string;
-}
+export const OPENROUTER_BASE_URL = 'https://openrouter.ai/api/v1'\;
 
-export interface ChatRequest {
-  model: string;
-  messages: ChatMessage[];
-  stream?: boolean;
-  temperature?: number;
-  top_p?: number;
-  max_tokens?: number;
-}
-
-export interface OpenRouterModel {
-  id: string;
-  name?: string;
-  pricing?: any;
-  price?: any;
-  context_length?: number;
-  contextLength?: number;
-  tags?: string[];
-  description?: string;
-}
-
-export interface OpenRouterModelsResponse {
-  data: OpenRouterModel[];
-}
-
-type ClientOpts = {
-  timeoutMs?: number;
-  baseUrl?: string;
-  referer?: string;
-  title?: string;
-  fetchImpl?: FetchFn;
-};
-
-export class OpenRouterClient {
-  private apiKey?: string;
-  private baseUrl = "https://openrouter.ai/api/v1"\;
-  private timeoutMs = 45000;
-  private cache = new Map<string, any>();
-  private fetchImpl: FetchFn;
-  private referer = (typeof window !== "undefined" ? window.location.origin : "http://localhost");
-  private title = "AI Chat PWA";
-
-  constructor(apiKey?: string, opts: ClientOpts = {}) {
-    this.apiKey = apiKey;
-    if (opts.baseUrl) this.baseUrl = opts.baseUrl.replace(/\/+$/, "");
-    if (opts.timeoutMs) this.timeoutMs = opts.timeoutMs;
-    if (opts.referer) this.referer = opts.referer;
-    if (opts.title) this.title = opts.title;
-    this.fetchImpl = opts.fetchImpl || fetch;
+/** Liest den API-Key aus Vite-Env. Warnung statt Crash, damit Dev-Server startet. */
+function getApiKey(): string {
+  const key = (import.meta as any)?.env?.VITE_OPENROUTER_API_KEY ?? '';
+  if (!key) {
+    // Hinweis: Ohne Key schlagen Requests zur API fehl – Build/Dev bleibt aber lauffähig.
+    // Setze VITE_OPENROUTER_API_KEY in .env (siehe .env.example).
+    console.warn('[openrouter] Kein VITE_OPENROUTER_API_KEY gesetzt.');
   }
+  return String(key);
+}
 
-  private headers(): HeadersInit {
-    const h: Record<string, string> = {
-      "Content-Type": "application/json",
-      "HTTP-Referer": this.referer,
-      "X-Title": this.title
-    };
-    if (this.apiKey) h["Authorization"] = `Bearer ${this.apiKey}`;
-    return h;
-  }
+/**
+ * Dünner Wrapper um fetch für OpenRouter-Endpunkte.
+ * - Normalisiert Pfad/Headers
+ * - JSON-Body Serialisierung
+ * - Fehler mit Response-Text für schnellere Diagnose
+ */
+export async function openRouterFetch(
+  path: string,
+  init: RequestInit & { body?: unknown } = {},
+): Promise<Response> {
+  const apiKey = getApiKey();
+  const url = `${OPENROUTER_BASE_URL}/${String(path).replace(/^\/+/, '')}`;
 
-  private async _fetch(url: string, init: RequestInit = {}): Promise<Response> {
-    const ac = new AbortController();
-    const t = setTimeout(() => ac.abort(), this.timeoutMs);
+  const headers: Record<string, string> = {
+    'Content-Type': 'application/json',
+    ...(init.headers as Record<string, string> | undefined),
+  };
+
+  // Authorization nur setzen, wenn Key vorhanden ist (sonst z. B. bei local mocks sauber)
+  if (apiKey) headers['Authorization'] = `Bearer ${apiKey}`;
+
+  const body =
+    typeof init.body === 'string'
+      ? init.body
+      : init.body != null
+      ? JSON.stringify(init.body)
+      : undefined;
+
+  const resp = await fetch(url, { ...init, headers, body });
+
+  if (!resp.ok) {
+    let text = '';
     try {
-      return await this.fetchImpl(url, { ...init, headers: { ...(init.headers || {}), ...this.headers() }, signal: ac.signal });
-    } finally {
-      clearTimeout(t);
+      text = await resp.text();
+    } catch {
+      /* ignore */
     }
+    throw new Error(`OpenRouter-Fehler ${resp.status}: ${text || resp.statusText}`);
   }
 
-  private cacheKey(url: string) { return `cache:${url}`; }
-  private getCached<T>(url: string): T | null {
-    const k = this.cacheKey(url);
-    const v = this.cache.get(k);
-    if (!v) return null;
-    if (Date.now() > v.expires) { this.cache.delete(k); return null; }
-    return v.data as T;
-  }
-  private setCached<T>(url: string, data: T, ttlMs = 5 * 60_000) {
-    const k = this.cacheKey(url);
-    this.cache.set(k, { data, expires: Date.now() + ttlMs });
-  }
-
-  async listModels(): Promise<OpenRouterModel[]> {
-    const url = `${this.baseUrl}/models`;
-    const res = await this._fetch(url, { method: "GET" });
-    if (!res.ok) throw new Error(`Models fetch failed: ${res.status}`);
-    const json = (await res.json()) as OpenRouterModelsResponse | any;
-    const list: OpenRouterModel[] = Array.isArray((json as any)?.data) ? (json as any).data : [];
-    return list;
-  }
-
-  async listModelsCached(): Promise<OpenRouterModel[]> {
-    const url = `${this.baseUrl}/models`;
-    const hit = this.getCached<OpenRouterModel[]>(url);
-    if (hit) return hit;
-    const list = await this.listModels();
-    this.setCached(url, list);
-    return list;
-  }
-
-  async chat(req: ChatRequest, signal?: AbortSignal): Promise<any> {
-    const url = `${this.baseUrl}/chat/completions`;
-    const res = await this._fetch(url, { method: "POST", body: JSON.stringify(req), signal });
-    if (!res.ok) {
-      const text = await res.text().catch(() => "");
-      throw new Error(`Chat failed: ${res.status} ${text}`);
-    }
-    return res.json();
-  }
-
-  async *chatStream(req: ChatRequest, signal?: AbortSignal): AsyncIterable<string> {
-    const url = `${this.baseUrl}/chat/completions`;
-    const res = await this._fetch(url, { method: "POST", body: JSON.stringify({ ...req, stream: true }), signal });
-    if (!res.ok || !res.body) {
-      const text = await res.text().catch(() => "");
-      throw new Error(`Chat stream failed: ${res.status} ${text}`);
-    }
-    const reader = res.body.getReader();
-    const decoder = new TextDecoder();
-    let buf = "";
-    while (true) {
-      const { done, value } = await reader.read();
-      if (done) break;
-      buf += decoder.decode(value, { stream: true });
-      const parts = buf.split("\n");
-      buf = parts.pop() || "";
-      for (const line of parts) {
-        const s = line.trim();
-        if (!s || !s.startsWith("data:")) continue;
-        const payload = s.slice(5).trim();
-        if (payload === "[DONE]") return;
-        yield payload;
-      }
-    }
-    if (buf.trim().startsWith("data:")) {
-      const payload = buf.trim().slice(5).trim();
-      if (payload && payload !== "[DONE]") yield payload;
-    }
-  }
+  return resp;
 }
+
+/** Kompatibilität: falls anderswo ein Default-Export des Base-URL erwartet wurde. */
+export default OPENROUTER_BASE_URL;

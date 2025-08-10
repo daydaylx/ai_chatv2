@@ -81,12 +81,12 @@ function App() {
     if (!online) { setError("Offline. Senden nicht möglich."); return; }
     if (!sessionId) { setError("Session nicht geladen."); return; }
 
-    const userMsg: Msg = { id: crypto.randomUUID(), role: "user", content: text };
+    const userMsg: Msg = { id: crypto.randomUUID(), role: "user" as const, content: text };
     setMessages(m => [...m, userMsg]);
-    await dbAddMessage({ id: userMsg.id, sessionId, role: "user", content: text, createdAt: Date.now() });
+    await dbAddMessage({ id: userMsg.id, sessionId, role: "user" as const, content: text, createdAt: Date.now() });
 
     const base: ChatMessage[] = [
-      { role: "system", content: persona.system },
+      { role: "system" as const, content: persona.system },
       ...messages,
       userMsg
     ].map(({ role, content }) => ({ role, content }));
@@ -107,7 +107,7 @@ function App() {
             copy[copy.length - 1] = { ...last, content: acc };
             return copy;
           }
-          return [...m, { id: assistantRef.id || "pending", role: "assistant", content: acc }];
+          return [...m, { id: assistantRef.id || "pending", role: "assistant" as const, content: acc }];
         });
         await upsertAssistantMessage(sessionId, assistantRef, acc);
       }

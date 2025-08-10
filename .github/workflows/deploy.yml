@@ -28,25 +28,35 @@ jobs:
       VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID }}
     steps:
       - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
-        with: { node-version: '20', cache: 'npm' }
-      - run: npm ci
 
-      - name: Validate env
+      - name: Validate & normalize env
+        shell: bash
         run: |
-          set -eu
-          [ -n "${VERCEL_TOKEN:-}" ] || { echo "VERCEL_TOKEN fehlt"; exit 1; }
-          [ -n "${VERCEL_ORG_ID:-}" ] || { echo "VERCEL_ORG_ID fehlt"; exit 1; }
-          [ -n "${VERCEL_PROJECT_ID:-}" ] || { echo "VERCEL_PROJECT_ID fehlt"; exit 1; }
+          set -Eeuo pipefail
+          T="$(printf '%s' "${VERCEL_TOKEN:-}" | tr -d '\r\n' | xargs || true)"
+          O="$(printf '%s' "${VERCEL_ORG_ID:-}" | tr -d '\r\n' | xargs || true)"
+          P="$(printf '%s' "${VERCEL_PROJECT_ID:-}" | tr -d '\r\n' | xargs || true)"
+          [ -n "$T" ] || { echo "❌ VERCEL_TOKEN fehlt/leer"; exit 1; }
+          [ -n "$O" ] || { echo "❌ VERCEL_ORG_ID fehlt/leer"; exit 1; }
+          [ -n "$P" ] || { echo "❌ VERCEL_PROJECT_ID fehlt/leer"; exit 1; }
+          echo "VERCEL_TOKEN_LEN=$(( ${#T} ))"
+          echo "VERCEL_ORG_ID=$O"
+          echo "VERCEL_PROJECT_ID=$P"
+          echo "T=$T" >> $GITHUB_ENV
+          echo "O=$O" >> $GITHUB_ENV
+          echo "P=$P" >> $GITHUB_ENV
+
+      - name: Vercel whoami (auth preflight)
+        run: npx --yes vercel@latest whoami --token "$T" --scope "$O"
 
       - name: vercel pull (prod)
         run: npx --yes vercel@latest pull --yes --environment=production \
-               --token "$VERCEL_TOKEN" --project "$VERCEL_PROJECT_ID" --scope "$VERCEL_ORG_ID"
+               --token "$T" --project "$P" --scope "$O"
 
       - name: vercel build (prebuilt)
         run: npx --yes vercel@latest build --prod \
-               --token "$VERCEL_TOKEN" --project "$VERCEL_PROJECT_ID" --scope "$VERCEL_ORG_ID"
+               --token "$T" --project "$P" --scope "$O"
 
       - name: vercel deploy (prebuilt to prod)
         run: npx --yes vercel@latest deploy --prebuilt --prod \
-               --token "$VERCEL_TOKEN" --project "$VERCEL_PROJECT_ID" --scope "$VERCEL_ORG_ID"
+               --token "$T" --project "$P" --scope "$O"

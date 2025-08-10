@@ -4,7 +4,7 @@
  * - Defensive Defaults + klare Fehlermeldungen.
  */
 
-export const OPENROUTER_BASE_URL = 'https://openrouter.ai/api/v1'\;
+export const OPENROUTER_BASE_URL = 'https://openrouter.ai/api/v1';
 
 /** Liest den API-Key aus Vite-Env. Warnung statt Crash, damit Dev-Server startet. */
 function getApiKey(): string {

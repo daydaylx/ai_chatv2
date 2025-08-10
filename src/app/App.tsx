@@ -6,6 +6,13 @@ import { getApiKey, setApiKey, clearApiKey } from "../lib/storage";
 import { getCurrentSession, getMessages as dbGetMessages, addMessage as dbAddMessage, upsertAssistantMessage } from "../lib/db";
 import ModelPicker from "../features/models/ModelPicker";
 import Backup from "../features/settings/Backup";
+import PersonaPicker from "../features/settings/PersonaPicker";
+import { getDefaultPreset, getPresetById, setPresetId, type PersonaPreset } from "../lib/presets";
+import SwUpdate from "./SwUpdate";
+import { mountKeyboardSafeArea } from "../lib/keyboard";
+import { applyTheme, getTheme, setTheme, type ThemeId } from "../lib/theme";
+import ThemePicker from "../features/settings/ThemePicker";
+import ScrollToBottom from "./ScrollToBottom";
 import "../styles/mobile.css";
 
 type Msg = ChatMessage & { id: string };
@@ -28,23 +35,29 @@ function App() {
   const [error, setError] = useState<string | null>(null);
   const [showModels, setShowModels] = useState(false);
   const [showBackup, setShowBackup] = useState(false);
+  const [showPersona, setShowPersona] = useState(false);
+  const [showTheme, setShowTheme] = useState(false);
 
   const abortRef = useRef<AbortController | null>(null);
   const [sessionId, setSessionId] = useState<string | null>(null);
 
+  const [persona, setPersona] = useState<PersonaPreset>(() => getDefaultPreset());
+  const [themeId, setThemeId] = useState<ThemeId>(() => getTheme().id);
+
   const apiKey = getApiKey();
 
   useEffect(() => {
+    applyTheme();
+    const off = mountKeyboardSafeArea();
     function syncOnline() { setOnline(navigator.onLine); }
     window.addEventListener("online", syncOnline);
     window.addEventListener("offline", syncOnline);
     return () => {
+      off();
       window.removeEventListener("online", syncOnline);
       window.removeEventListener("offline", syncOnline);
     };
   }, []);
-
-  useEffect(() => { localStorage.setItem("model", model); }, [model]);
 
   useEffect(() => {
     (async () => {
@@ -70,10 +83,13 @@ function App() {
 
     const userMsg: Msg = { id: crypto.randomUUID(), role: "user", content: text };
     setMessages(m => [...m, userMsg]);
-
     await dbAddMessage({ id: userMsg.id, sessionId, role: "user", content: text, createdAt: Date.now() });
 
-    const base: ChatMessage[] = [...messages, userMsg].map(({ role, content }) => ({ role, content }));
+    const base: ChatMessage[] = [
+      { role: "system", content: persona.system },
+      ...messages,
+      userMsg
+    ].map(({ role, content }) => ({ role, content }));
 
     setStreaming(true);
     const ac = new AbortController();
@@ -84,7 +100,6 @@ function App() {
       let acc = "";
       for await (const chunk of client.chatStream({ model, messages: base, stream: true }, ac.signal)) {
         acc += chunk;
-        // UI
         setMessages(m => {
           const last = m[m.length - 1];
           if (last?.role === "assistant") {
@@ -94,7 +109,6 @@ function App() {
           }
           return [...m, { id: assistantRef.id || "pending", role: "assistant", content: acc }];
         });
-        // DB
         await upsertAssistantMessage(sessionId, assistantRef, acc);
       }
     } catch (e) {
@@ -126,15 +140,33 @@ function App() {
     }
   }
 
+  function setPersonaById(id: PersonaPreset["id"]) {
+    const p = getPresetById(id);
+    if (p) {
+      setPersona(p);
+      setPresetId(p.id);
+    }
+  }
+
+  function setThemeById(id: ThemeId) {
+    setTheme(id);
+    setThemeId(id);
+  }
+
   return (
     <div className="app">
+      <SwUpdate />
       <header className="topbar">
-        <div className="topbar__left">
+        <div className="topbar__left brand">
           <strong>AI Chat</strong>
         </div>
         <div className="topbar__right">
-          <button className="keybtn" onClick={() => setShowModels(true)}>Modelle</button>
-          <button className="keybtn" onClick={() => setShowBackup(true)}>Backup</button>
+          <button className="keybtn" onClick={() => setShowModels(true)} aria-label="Modelle">Modelle</button>
+          <button className="keybtn" onClick={() => setShowPersona(true)} aria-label="Stil wählen">
+            Stil: {persona.label}
+          </button>
+          <button className="keybtn" onClick={() => setShowTheme(true)} aria-label="Theme">Theme</button>
+          <button className="keybtn" onClick={() => setShowBackup(true)} aria-label="Backup">Backup</button>
           {!apiKey ? (
             <button className="keybtn" onClick={handleSetKey}>Key setzen</button>
           ) : (
@@ -155,11 +187,13 @@ function App() {
         )}
         {messages.map(m => (
           <div key={m.id} className={`msg msg--${m.role}`}>
-            <div className="msg__bubble">{m.content}</div>
+            <div className={`msg__bubble ${m.role === "assistant" ? "msg__bubble--assistant" : ""}`}>{m.content}</div>
           </div>
         ))}
         <div style={{ height: 96 }} />
       </main>
+
+      <ScrollToBottom />
 
       <footer className="bottombar">
         <InputBar disabled={!apiKey} isStreaming={streaming} onSend={send} onAbort={abort} />
@@ -173,6 +207,20 @@ function App() {
           client={client}
         />
       )}
+
+      <PersonaPicker
+        visible={showPersona}
+        currentId={persona.id}
+        onPick={setPersonaById}
+        onClose={() => setShowPersona(false)}
+      />
+
+      <ThemePicker
+        visible={showTheme}
+        currentId={themeId}
+        onPick={setThemeById}
+        onClose={() => setShowTheme(false)}
+      />
 
       <Backup visible={showBackup} onClose={() => setShowBackup(false)} />
     </div>

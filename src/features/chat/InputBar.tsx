@@ -2,43 +2,51 @@ import { useEffect, useRef, useState } from "react";
 
 type Props = {
   disabled?: boolean;
+  isStreaming: boolean;
   onSend: (text: string) => void;
   onAbort: () => void;
-  isStreaming: boolean;
 };
 
-export default function InputBar({ disabled, onSend, onAbort, isStreaming }: Props) {
+const MAX_LEN = 16000;
+const COOLDOWN_MS = 1200;
+
+function vibe(ms: number) { try { (navigator as any).vibrate?.(ms); } catch {} }
+
+export default function InputBar({ disabled, isStreaming, onSend, onAbort }: Props) {
   const [text, setText] = useState("");
+  const [cooldownUntil, setCooldownUntil] = useState<number>(0);
   const taRef = useRef<HTMLTextAreaElement | null>(null);
 
-  useEffect(() => {
-    // Mobile-Keyboard Handling
-    const vv = (window as any).visualViewport;
-    const el = document.documentElement;
-    function onResize() {
-      if (!vv) return;
-      const bottom = Math.max(0, (window.innerHeight - vv.height - vv.offsetTop));
-      el.style.setProperty("--kb-safe", bottom + "px");
-    }
-    vv?.addEventListener?.("resize", onResize);
-    onResize();
-    return () => vv?.removeEventListener?.("resize", onResize);
-  }, []);
+  const now = Date.now();
+  const cooling = now < cooldownUntil;
 
-  function handleKey(e: React.KeyboardEvent<HTMLTextAreaElement>) {
-    if (e.key === "Enter" && (e.ctrlKey || e.metaKey)) {
-      e.preventDefault();
-      trySend();
-    }
+  useEffect(() => {
+    const el = taRef.current;
+    if (!el) return;
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Enter" && (e.ctrlKey || e.metaKey)) {
+        e.preventDefault();
+        handleSend();
+      }
+    };
+    el.addEventListener("keydown", onKey as any);
+    return () => el.removeEventListener("keydown", onKey as any);
+  }, [text, disabled, isStreaming, cooling]);
+
+  function handleSend() {
+    if (disabled || isStreaming || cooling) return;
+    const t = text.trim();
+    if (!t) return;
+    if (t.length > MAX_LEN) { alert(`Zu lang (${t.length}). Max ${MAX_LEN}.`); return; }
+    onSend(t);
+    setText("");
+    setCooldownUntil(Date.now() + COOLDOWN_MS);
+    vibe(12);
   }
 
-  function trySend() {
-    const val = text.trim();
-    if (!val) return;
-    if (val.length > 5000 && !confirm("Eingabe > 5000 Zeichen. Wirklich senden?")) return;
-    onSend(val);
-    setText("");
-    taRef.current?.focus();
+  function handleAbort() {
+    onAbort();
+    vibe(24);
   }
 
   return (
@@ -46,22 +54,24 @@ export default function InputBar({ disabled, onSend, onAbort, isStreaming }: Pro
       <textarea
         ref={taRef}
         className="inputbar__textarea"
-        placeholder="Nachricht…  (Ctrl/⌘+Enter senden)"
+        placeholder={disabled ? "API-Key fehlt. Tippe oben auf „Key setzen“." : "Nachricht eingeben…"}
         value={text}
-        onChange={(e) => setText(e.target.value)}
-        onKeyDown={handleKey}
+        onChange={(e) => setText(e.target.value.slice(0, MAX_LEN))}
+        disabled={!!disabled || isStreaming}
         rows={1}
-        disabled={disabled || isStreaming}
       />
-      {!isStreaming ? (
-        <button className="inputbar__btn" disabled={disabled || !text.trim()} onClick={trySend} aria-label="Senden">
-          ➤
-        </button>
-      ) : (
-        <button className="inputbar__btn abort" onClick={onAbort} aria-label="Abbrechen">
-          ✕
-        </button>
-      )}
+      <button
+        className={`inputbar__btn ${isStreaming ? "abort" : ""}`}
+        onClick={() => (isStreaming ? handleAbort() : handleSend())}
+        disabled={!!disabled || (cooling && !isStreaming)}
+        aria-label={isStreaming ? "Abbrechen" : "Senden"}
+        title={cooling && !isStreaming ? "Kurz warten…" : ""}
+      >
+        {isStreaming ? "⛔" : "➤"}
+      </button>
+      <div style={{ alignSelf: "end", fontSize: 11, color: "var(--muted)", minWidth: 68, textAlign: "right", padding: "0 4px 6px 4px" }}>
+        {text.length}/{MAX_LEN}
+      </div>
     </div>
   );
 }

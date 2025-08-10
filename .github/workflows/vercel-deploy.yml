@@ -1,0 +1,36 @@
+name: vercel-deploy-hook
+on:
+  push:
+    branches: [ "main" ]
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: { node-version: '20', cache: 'npm' }
+      - run: npm ci
+      - run: npm run build
+
+  trigger:
+    needs: verify
+    runs-on: ubuntu-latest
+    steps:
+      - name: Trigger Vercel Deploy Hook (prod)
+        env:
+          HOOK_RAW: ${{ secrets.VERCEL_DEPLOY_HOOK }}
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+          HOOK="$(printf '%s' "${HOOK_RAW:-}" | tr -d '\r\n' | xargs || true)"
+          if [ -z "$HOOK" ]; then
+            echo "❌ Secret VERCEL_DEPLOY_HOOK ist leer."; exit 1
+          fi
+          case "$HOOK" in
+            https://api.vercel.com/\*\) ;;
+            *) echo "❌ Secret sieht nicht wie eine Vercel-Hook-URL aus: $HOOK"; exit 2;;
+          esac
+          echo "→ Trigger Vercel Deploy Hook…"
+          curl -fsS -X POST "$HOOK" >/dev/null
+          echo "✓ OK"

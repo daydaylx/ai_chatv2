@@ -1,149 +1,133 @@
 /**
- * OpenRouter API – Browser/Vite-Client ohne externe Deps.
- * - Korrekte Syntax
- * - Named Exports: OpenRouterClient, OpenRouterModel, ChatMessage
- * - Fallback-Key: localStorage('openrouter_api_key') -> import.meta.env.VITE_OPENROUTER_API_KEY
+ * OpenRouter API-Client (Browser, private Nutzung).
+ * - API-Key aus localStorage("openrouter_api_key") oder Vite-Env.
+ * - listModels() und chat() (nicht-streaming) mit Fehlerbehandlung.
+ * Hinweis: Client-seitige Keys sind nur für private Builds geeignet.
  */
-export const OPENROUTER_BASE_URL = 'https://openrouter.ai/api/v1'
 
-export type ChatMessage = { role: 'system' | 'user' | 'assistant'; content: string };
+export type ChatRole = 'system' | 'user' | 'assistant' | 'tool';
 
-export type OpenRouterModel = {
+export interface ChatMessage {
+  role: ChatRole;
+  content: string;
+}
+
+export interface OpenRouterModel {
   id: string;
   name?: string;
   context_length?: number;
-  input_price?: number;
-  output_price?: number;
-  pricing?: any;
-  price?: any;
-};
-
-const LS_KEY = 'openrouter_api_key';
-
-export class OpenRouterError extends Error {
-  readonly status: number;
-  readonly statusText: string;
-  readonly details?: unknown;
-  constructor(message: string, status: number, statusText: string, details?: unknown) {
-    super(message);
-    this.name = 'OpenRouterError';
-    this.status = status;
-    this.statusText = statusText;
-    this.details = details;
-  }
+  pricing?: { prompt?: number; completion?: number; currency?: string };
 }
 
-function getEnvKey(): string {
-  const env: any = (import.meta as any)?.env || {};
-  return String(env.VITE_OPENROUTER_API_KEY || '');
+export interface ChatResponse {
+  id: string;
+  model: string;
+  content: string;
+  raw: unknown;
 }
 
-function buildUrl(path: string): string {
-  return `${OPENROUTER_BASE_URL}/${String(path).replace(/^\//, '')}`;
+const OPENROUTER_BASE = 'https://openrouter.ai/api/v1'\;
+
+function readApiKey(): string | null {
+  // Priorität: localStorage → .env (Vite)
+  try {
+    const ls = localStorage.getItem('openrouter_api_key');
+    if (ls && ls.trim()) return ls.trim();
+  } catch {
+    /* SSR / Privacy */
+  }
+  const env = (import.meta as any).env?.VITE_OPENROUTER_API_KEY as string | undefined;
+  return env && env.trim() ? env.trim() : null;
 }
 
-function normalizeHeaders(h?: HeadersInit): Record<string, string> {
-  if (!h) return {};
-  if (h instanceof Headers) {
-    const o: Record<string, string> = {};
-    h.forEach((v, k) => (o[k] = v));
-    return o;
+function commonHeaders(apiKey: string): Record<string, string> {
+  const headers: Record<string, string> = {
+    'Content-Type': 'application/json',
+    'Authorization': `Bearer ${apiKey}`,
+  };
+  // optionale, von OpenRouter empfohlene Header
+  try {
+    headers['HTTP-Referer'] = location?.origin ?? 'http://localhost'\;
+  } catch {
+    /* ignore */
   }
-  if (Array.isArray(h)) {
-    const o: Record<string, string> = {};
-    for (const [k, v] of h) o[String(k)] = String(v);
-    return o;
-  }
-  return { ...(h as Record<string, string>) };
+  headers['X-Title'] = 'AI Chat (private)';
+  return headers;
 }
 
-type JsonInit = Omit<RequestInit, 'body'> & { body?: unknown };
-
-export async function openRouterFetch(path: string, init: JsonInit = {}): Promise<Response> {
-  const url = buildUrl(path);
-  const headers = normalizeHeaders(init.headers);
-  const hasBody = init.body !== undefined;
-  const isStringBody = typeof init.body === 'string';
-
-  if (hasBody && !isStringBody && headers['Content-Type'] == null) {
-    headers['Content-Type'] = 'application/json';
-  }
-  if (headers['Accept'] == null) headers['Accept'] = 'application/json';
-
-  const apiKey = headers['Authorization']?.startsWith('Bearer ')
-    ? ''
-    : (localStorage.getItem(LS_KEY) || getEnvKey());
-
-  if (apiKey && !headers['Authorization']) {
-    headers['Authorization'] = `Bearer ${apiKey}`;
-  }
-
-  const body =
-    !hasBody ? undefined : isStringBody ? (init.body as string) : JSON.stringify(init.body);
-
-  const resp = await fetch(url, { ...init, headers, body });
-  if (!resp.ok) {
-    let details: unknown;
+async function safeFetch(url: string, init: RequestInit): Promise<Response> {
+  const res = await fetch(url, { ...init });
+  if (!res.ok) {
+    let detail = '';
     try {
-      const ct = resp.headers.get('content-type') || '';
-      details = ct.includes('application/json') ? await resp.json() : await resp.text();
-    } catch { /* no-op */ }
-    const msg =
-      typeof details === 'string'
-        ? details
-        : (details as any)?.error?.message ||
-          `OpenRouter-Fehler ${resp.status} ${resp.statusText}`;
-    throw new OpenRouterError(String(msg), resp.status, resp.statusText, details);
-  }
-  return resp;
-}
-
-export async function openRouterJson<T>(path: string, init: JsonInit = {}): Promise<T> {
-  const r = await openRouterFetch(path, init);
-  const ct = r.headers.get('content-type') || '';
-  if (!ct.includes('application/json')) {
-    const text = await r.text().catch(() => '');
-    throw new OpenRouterError('Unerwartetes Response-Format (JSON erwartet).', r.status, r.statusText, text);
-  }
-  return (await r.json()) as T;
-}
-
-export class OpenRouterClient {
-  getApiKey(): string {
-    return localStorage.getItem(LS_KEY) || getEnvKey() || '';
-  }
-  
-  setApiKey(key: string) {
-    if (key) localStorage.setItem(LS_KEY, key);
-  }
-  
-  clearApiKey() {
-    localStorage.removeItem(LS_KEY);
-  }
-
-  async listModels(): Promise<OpenRouterModel[]> {
-    const data = await openRouterJson<{ data: OpenRouterModel[] }>('models', { method: 'GET' });
-    return (data?.data ?? []).filter(m => !!m.id);
-  }
-
-  async chat(opts: { 
-    model: string; 
-    messages: ChatMessage[]; 
-    temperature?: number; 
-    max_tokens?: number; 
-  }): Promise<{ content: string }> {
-    const res = await openRouterJson<any>('chat/completions', {
-      method: 'POST',
-      body: {
-        model: opts.model,
-        messages: opts.messages,
-        temperature: opts.temperature ?? 0.7,
-        max_tokens: opts.max_tokens ?? 2048
+      const data = await res.json();
+      // OpenRouter-Fehler sitzen häufig unter error.message
+      detail = (data as any)?.error?.message || JSON.stringify(data);
+    } catch {
+      try {
+        detail = await res.text();
+      } catch {
+        /* ignore */
       }
-    });
-    const text = res?.choices?.[0]?.message?.content ?? '';
-    return { content: String(text) };
+    }
+    throw new Error(`HTTP ${res.status} ${res.statusText} – ${detail || 'Unbekannter Fehler'}`);
   }
+  return res;
 }
 
-export default OpenRouterClient;
+/** Modelle abrufen (benötigt gültigen API-Key) */
+export async function listModels(signal?: AbortSignal): Promise<OpenRouterModel[]> {
+  const key = readApiKey();
+  if (!key) throw new Error('Kein OpenRouter API-Key konfiguriert.');
+  const res = await safeFetch(`${OPENROUTER_BASE}/models`, {
+    method: 'GET',
+    headers: commonHeaders(key),
+    signal,
+  });
+  const data = await res.json();
+  const models = ((data as any)?.data ?? []) as any[];
+  return models.map((m) => ({
+    id: m.id ?? m.slug ?? '',
+    name: m.name ?? m.id,
+    context_length: m.context_length,
+    pricing: m.pricing,
+  }));
+}
+
+/** Nicht‑streaming Chat‑Completion */
+export async function chat(model: string, messages: ChatMessage[], signal?: AbortSignal): Promise<ChatResponse> {
+  if (!model) throw new Error('Kein Modell angegeben.');
+  const key = readApiKey();
+  if (!key) throw new Error('Kein OpenRouter API-Key konfiguriert.');
+
+  const body = {
+    model,
+    messages: messages.map(m => ({ role: m.role, content: m.content })),
+    stream: false,
+  };
+
+  const res = await safeFetch(`${OPENROUTER_BASE}/chat/completions`, {
+    method: 'POST',
+    headers: commonHeaders(key),
+    body: JSON.stringify(body),
+    signal,
+  });
+  const data: any = await res.json();
+
+  const choice = data?.choices?.[0];
+  const content: string = choice?.message?.content ?? '';
+  const modelUsed: string = data?.model ?? choice?.model ?? model;
+
+  // Fallback-ID falls API keine liefert
+  const id: string =
+    typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function'
+      ? crypto.randomUUID()
+      : String(Date.now());
+
+  return {
+    id: data?.id ?? id,
+    model: modelUsed,
+    content,
+    raw: data,
+  };
+}

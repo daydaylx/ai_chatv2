@@ -1,121 +1,127 @@
-import { FormEvent, useEffect, useRef, useState } from 'react';
-import { ChatMessage, chat } from '../../lib/openrouter';
+import { useEffect, useMemo, useRef, useState, type KeyboardEvent as ReactKeyboardEvent } from "react";
+import type { ChatMessage } from "../../lib/openrouter";
+import { OpenRouterClient } from "../../lib/openrouter";
+import { PRESETS } from "../../lib/presets";
 
-type Props = { model: string };
+type Bubble = ChatMessage & { id: string; ts: number };
 
-export default function ChatPanel({ model }: Props) {
-  const [messages, setMessages] = useState<ChatMessage[]>([
-    { role: 'system', content: 'Du bist ein hilfreicher Assistent.' },
-  ]);
-  const [input, setInput] = useState<string>('');
-  const [pending, setPending] = useState<boolean>(false);
-  const [error, setError] = useState<string | null>(null);
-  const abortRef = useRef<AbortController | null>(null);
+type Props = {
+  client: OpenRouterClient;
+  modelId: string | "";
+  apiKeyPresent: boolean;
+  onOpenSettings: () => void;
+  personaId: string;
+};
+
+function uuid() {
+  if ((globalThis as any)?.crypto?.randomUUID) return (globalThis as any).crypto.randomUUID();
+  return `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+}
+
+export default function ChatPanel({ client, modelId, apiKeyPresent, onOpenSettings, personaId }: Props) {
+  const initialSystem = PRESETS.find(p => p.id === personaId);
+  const [items, setItems] = useState<Bubble[]>(initialSystem ? [{ id: uuid(), role: "system", content: initialSystem.system, ts: Date.now() }] : []);
+  const [input, setInput] = useState("");
+  const [busy, setBusy] = useState(false);
   const listRef = useRef<HTMLDivElement | null>(null);
+  const taRef = useRef<HTMLTextAreaElement | null>(null);
 
-  function scrollToBottom(): void {
+  const disabledReason = useMemo(() => {
+    if (!apiKeyPresent) return "Kein API-Key gesetzt";
+    if (!modelId) return "Kein Modell gewählt";
+    return "";
+  }, [apiKeyPresent, modelId]);
+
+  useEffect(() => {
+    const ta = taRef.current;
+    if (!ta) return;
+    const resize = () => { ta.style.height = "auto"; ta.style.height = Math.min(ta.scrollHeight, 160) + "px"; };
+    resize();
+    ta.addEventListener("input", resize);
+    return () => ta.removeEventListener("input", resize);
+  }, []);
+
+  useEffect(() => {
     const el = listRef.current;
     if (!el) return;
-    el.scrollTo({ top: el.scrollHeight, behavior: 'smooth' });
-  }
+    el.scrollTop = el.scrollHeight + 1000;
+  }, [items, busy]);
 
-  useEffect(() => { scrollToBottom(); }, [messages.length, pending]);
-
-  async function onSubmit(e: FormEvent<HTMLFormElement>): Promise<void> {
-    e.preventDefault();
-    const content = input.trim();
-    if (!content || pending) return;
-
-    const userMsg: ChatMessage = { role: 'user', content };
-    const next = [...messages, userMsg];
-    setMessages(next);
-    setInput('');
-    setPending(true);
-    setError(null);
-
-    const ctrl = new AbortController();
-    abortRef.current = ctrl;
+  async function send() {
+    if (busy || !input.trim()) return;
+    if (disabledReason) { onOpenSettings(); return; }
+    const userMsg: Bubble = { id: uuid(), role: "user", content: input.trim(), ts: Date.now() };
+    setInput("");
+    setItems(prev => [...prev, userMsg]);
+    setBusy(true);
 
     try {
-      const res = await chat(model, next, ctrl.signal);
-      const assistant: ChatMessage = { role: 'assistant', content: res.content || '(keine Antwort)' };
-      setMessages(m => [...m, assistant]);
-    } catch (e) {
-      const msg = e instanceof Error ? e.message : String(e);
-      setError(msg);
+      const res = await client.chat({
+        model: modelId!,
+        messages: items.map(({ role, content }) => ({ role, content })).concat([{ role: "user", content: userMsg.content }]),
+        temperature: 0.7,
+        max_tokens: 1024
+      });
+      const botMsg: Bubble = { id: uuid(), role: "assistant", content: res.content, ts: Date.now() };
+      setItems(prev => [...prev, botMsg]);
+    } catch (e: any) {
+      const errMsg: Bubble = { id: uuid(), role: "assistant", content: `❌ ${e?.message ?? e}`, ts: Date.now() };
+      setItems(prev => [...prev, errMsg]);
     } finally {
-      setPending(false);
-      abortRef.current = null;
+      setBusy(false);
+      setTimeout(() => taRef.current?.focus(), 0);
     }
   }
 
-  function onAbort(): void {
-    abortRef.current?.abort();
-    setPending(false);
+  function handleKey(e: ReactKeyboardEvent<HTMLTextAreaElement>) {
+    if (e.key === "Enter" && !e.shiftKey) {
+      e.preventDefault();
+      send();
+    }
   }
 
   return (
-    <div style={{ display: 'grid', gridTemplateRows: '1fr auto', height: '100%' }}>
-      <div ref={listRef} style={{ overflow: 'auto', padding: 16 }}>
-        {messages.filter(m => m.role !== 'system').map((m, idx) => (
-          <div key={idx} style={{ marginBottom: 12 }}>
-            <div style={{ fontSize: 12, color: '#9ca3af', textTransform: 'uppercase' }}>{m.role}</div>
-            <div style={{ whiteSpace: 'pre-wrap', background: '#151f2f', border: '1px solid #1f2937', borderRadius: 10, padding: '10px 12px' }}>
-              {m.content}
+    <div className="chat-root">
+      {disabledReason && (
+        <div className="notice">
+          <span>{disabledReason}</span>
+          <button className="btn" onClick={onOpenSettings}>Einstellungen</button>
+        </div>
+      )}
+      <div className="chat-list" ref={listRef} aria-live="polite" aria-label="Chat-Verlauf">
+        {items.map(item => (
+          <div key={item.id} className={`bubble ${item.role === "user" ? "bubble--user" : "bubble--bot"}`}>
+            <div className="bubble__txt">{item.content}</div>
+            <div className={`bubble__meta ${item.role === "user" ? "meta--r" : "meta--l"}`}>
+              {new Date(item.ts).toLocaleTimeString()}
             </div>
           </div>
         ))}
-        {pending && (
-          <div>
-            <div style={{ fontSize: 12, color: '#9ca3af', textTransform: 'uppercase' }}>assistant</div>
-            <div style={{ whiteSpace: 'pre-wrap', background: '#151f2f', border: '1px solid #1f2937', borderRadius: 10, padding: '10px 12px' }}>
-              …denke nach
+        {busy && (
+          <div className="bubble bubble--bot">
+            <div className="bubble__dots" aria-label="Antwort wird erzeugt">
+              <span className="dot" /><span className="dot" /><span className="dot" />
             </div>
           </div>
         )}
       </div>
 
-      <form onSubmit={onSubmit} style={{ display: 'grid', gridTemplateColumns: '1fr auto', gap: 12, padding: 12, borderTop: '1px solid #1f2937' }}>
+      <div className="composer" role="group" aria-label="Nachricht schreiben">
         <textarea
-          placeholder="Frage eingeben…"
+          ref={taRef}
+          rows={1}
+          className="composer__input"
+          placeholder="Nachricht schreiben…"
           value={input}
           onChange={(e) => setInput(e.target.value)}
-          onKeyDown={(e) => {
-            if (e.key === 'Enter' && !e.shiftKey) {
-              e.preventDefault();
-              e.currentTarget.form?.requestSubmit();
-            }
-          }}
-          style={{
-            width: '100%', minHeight: 56, maxHeight: 220, resize: 'vertical',
-            padding: '10px 12px', borderRadius: 10, border: '1px solid #1f2937',
-            background: '#0b1324', color: '#e5e7eb', fontSize: 15, lineHeight: 1.5,
-          }}
+          onKeyDown={handleKey}
+          disabled={!!disabledReason || busy}
+          inputMode="text"
         />
-        <div style={{ display: 'flex', gap: 8, alignItems: 'flex-end' }}>
-          <button
-            type="submit"
-            disabled={pending || !input.trim()}
-            style={{ background: '#3b82f6', color: 'white', border: 'none', padding: '8px 12px', borderRadius: 8, fontWeight: 600, cursor: 'pointer', opacity: (pending || !input.trim()) ? .6 : 1 }}
-          >
-            Senden
-          </button>
-          <button
-            type="button"
-            disabled={!pending}
-            onClick={onAbort}
-            style={{ background: '#1f2937', color: 'white', border: 'none', padding: '8px 12px', borderRadius: 8, fontWeight: 600, cursor: 'pointer', opacity: !pending ? .6 : 1 }}
-          >
-            Abbrechen
-          </button>
-        </div>
-      </form>
-
-      {error && (
-        <div style={{ padding: '8px 12px', color: '#ef4444', fontSize: 12 }}>
-          Fehler: {error}
-        </div>
-      )}
+        <button className="btn btn--send" onClick={send} disabled={!!disabledReason || busy || !input.trim()} aria-label="Senden">
+          <svg width="22" height="22" viewBox="0 0 24 24" aria-hidden="true"><path d="M2 21l21-9L2 3l5 8-5 10zm5-10 13-1L7 11Zm0 0 13 1L7 11Z" fill="currentColor"/></svg>
+        </button>
+      </div>
     </div>
   );
 }

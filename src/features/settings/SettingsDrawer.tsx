@@ -9,9 +9,11 @@ type Props = {
   modelId: string | "";
   onModelChange: (id: string) => void;
   onKeyChanged?: () => void;
+  personaLabel?: string;
+  onOpenPersona?: () => void;
 };
 
-export default function SettingsDrawer({ open, onClose, client, modelId, onModelChange, onKeyChanged }: Props) {
+export default function SettingsDrawer({ open, onClose, client, modelId, onModelChange, onKeyChanged, personaLabel, onOpenPersona }: Props) {
   const [key, setKey] = useState("");
   const panelRef = useRef<HTMLDivElement | null>(null);
   const lastActive = useRef<HTMLElement | null>(null);
@@ -21,11 +23,9 @@ export default function SettingsDrawer({ open, onClose, client, modelId, onModel
       setKey(client.getApiKey());
       lastActive.current = (document.activeElement as HTMLElement) ?? null;
       setTimeout(() => panelRef.current?.focus(), 30);
-      const onKey = (e: KeyboardEvent) => {
-        if (e.key === "Escape") onClose();
-      };
-      document.addEventListener("keydown", onKey);
-      return () => document.removeEventListener("keydown", onKey);
+      const onKeyEsc = (e: KeyboardEvent) => { if (e.key === "Escape") onClose(); };
+      document.addEventListener("keydown", onKeyEsc);
+      return () => document.removeEventListener("keydown", onKeyEsc);
     } else {
       lastActive.current?.focus?.();
     }
@@ -42,15 +42,8 @@ export default function SettingsDrawer({ open, onClose, client, modelId, onModel
     return () => document.removeEventListener("click", onBackdrop);
   }, [open, onClose]);
 
-  function saveKey() {
-    client.setApiKey(key.trim());
-    onKeyChanged?.();
-  }
-  function clearKey() {
-    client.clearApiKey();
-    setKey("");
-    onKeyChanged?.();
-  }
+  function saveKey() { client.setApiKey(key.trim()); onKeyChanged?.(); }
+  function clearKey() { client.clearApiKey(); setKey(""); onKeyChanged?.(); }
 
   const modelLabel = useMemo(() => (modelId ? modelId : "Bitte wählen…"), [modelId]);
 
@@ -60,7 +53,7 @@ export default function SettingsDrawer({ open, onClose, client, modelId, onModel
         <div className="sheet__header">
           <div className="sheet__title">Einstellungen</div>
           <button className="m-icon-btn" aria-label="Schließen" onClick={onClose}>
-            <svg width="22" height="22" viewBox="0 0 24 24" aria-hidden="true"><path d="M18 6 6 18M6 6l12 12" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
+            <svg width="22" height="22" viewBox="0 0 24 24" aria-hidden="true"><path d="M18 6 6 18M6 6l12 12" stroke="currentColor" strokeWidth="2" strokeLinecap="round"/></svg>
           </button>
         </div>
 
@@ -68,15 +61,8 @@ export default function SettingsDrawer({ open, onClose, client, modelId, onModel
           <section className="block">
             <h3 className="block__title">API-Key</h3>
             <div className="field">
-              <input
-                type="password"
-                placeholder="sk-..."
-                className="input"
-                value={key}
-                onChange={(e) => setKey(e.target.value)}
-                autoComplete="off"
-                spellCheck={false}
-              />
+              <input type="password" placeholder="sk-..." className="input" value={key}
+                     onChange={(e) => setKey(e.target.value)} autoComplete="off" spellCheck={false}/>
             </div>
             <div className="row">
               <button className="btn" onClick={saveKey} disabled={!key.trim()}>Speichern</button>
@@ -88,6 +74,12 @@ export default function SettingsDrawer({ open, onClose, client, modelId, onModel
             <h3 className="block__title">Modell</h3>
             <ModelPicker value={modelId || ""} onChange={onModelChange} client={client} />
             <div className="hint">Aktuelles Modell: <code>{modelLabel}</code></div>
+          </section>
+
+          <section className="block">
+            <h3 className="block__title">Antwort-Stil</h3>
+            <button className="btn" onClick={onOpenPersona}>Stil wählen…</button>
+            {personaLabel && <div className="hint">Aktueller Stil: <code>{personaLabel}</code></div>}
           </section>
         </div>
 

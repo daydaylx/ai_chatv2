@@ -1,27 +1,15 @@
-# Node / Vite
 node_modules/
 dist/
 build/
 .vite/
 *.log
-
-# Local env & tooling
 .env
 .env.*
 *.local
-
-# OS
 .DS_Store
 Thumbs.db
-
-# Hosting
-.vercel
-.netlify
-
-# IDE
+.vercel/
+.netlify/
 .vscode/
 .idea/
-*.bak
-.env
-node_modules
-dist
+ai_chatv2-main/

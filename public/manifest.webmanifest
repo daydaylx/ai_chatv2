@@ -1,15 +1,13 @@
 {
-  "name": "AI Chat PWA (Private Mobile)",
+  "name": "AI Chat Mobile PWA",
   "short_name": "AI Chat",
-  "description": "Private, mobile-only AI chat. Local key. No telemetry.",
-  "display": "standalone",
+  "description": "Private, mobile-first AI chat PWA.",
   "start_url": "/",
   "scope": "/",
+  "display": "standalone",
+  "background_color": "#0b0f19",
+  "theme_color": "#0b0f19",
   "lang": "de",
-  "dir": "ltr",
-  "theme_color": "#0b0f14",
-  "background_color": "#0b0f14",
-  "orientation": "portrait",
   "icons": [
     { "src": "/icons/icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any maskable" },
     { "src": "/icons/icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any maskable" }

@@ -1,264 +1,121 @@
-import React, { useState, useEffect, useRef, useCallback } from 'react';
-import { ChatItem, Model, Preset } from '../types';
-import { presets } from '../presets';
-import MessageBubble from './MessageBubble';
-import ChatComposer from './ChatComposer';
-import PersonaPicker from './PersonaPicker';
-import ModelPicker from './ModelPicker';
+import { FormEvent, useEffect, useRef, useState } from 'react';
+import { ChatMessage, chat } from '../lib/openrouter';
 
-interface ChatPanelProps {
-  items: ChatItem[];
-  setItems: React.Dispatch<React.SetStateAction<ChatItem[]>>;
-  selectedModel: Model;
-  onModelChange: (model: Model) => void;
-  isGenerating: boolean;
-  setIsGenerating: React.Dispatch<React.SetStateAction<boolean>>;
-}
+type Props = { model: string };
 
-const ChatPanel: React.FC<ChatPanelProps> = ({
-  items,
-  setItems,
-  selectedModel,
-  onModelChange,
-  isGenerating,
-  setIsGenerating
-}) => {
-  const [userMsg, setUserMsg] = useState({ role: 'user' as const, content: '' });
-  const [selectedPresetId, setSelectedPresetId] = useState('frech_direkt');
-  const [showPersonaPicker, setShowPersonaPicker] = useState(false);
-  const [showModelPicker, setShowModelPicker] = useState(false);
-  const messagesEndRef = useRef<HTMLDivElement>(null);
-  const abortControllerRef = useRef<AbortController | null>(null);
+export default function ChatPanel({ model }: Props) {
+  const [messages, setMessages] = useState<ChatMessage[]>([
+    { role: 'system', content: 'Du bist ein hilfreicher Assistent.' },
+  ]);
+  const [input, setInput] = useState<string>('');
+  const [pending, setPending] = useState<boolean>(false);
+  const [error, setError] = useState<string | null>(null);
+  const abortRef = useRef<AbortController | null>(null);
+  const listRef = useRef<HTMLDivElement | null>(null);
 
-  // Preset aus localStorage laden
-  useEffect(() => {
-    const saved = localStorage.getItem('selectedPreset');
-    if (saved && presets.find(p => p.id === saved)) {
-      setSelectedPresetId(saved);
-    }
-  }, []);
+  function scrollToBottom(): void {
+    const el = listRef.current;
+    if (!el) return;
+    el.scrollTo({ top: el.scrollHeight, behavior: 'smooth' });
+  }
 
-  // Auto-scroll zu neuen Nachrichten
-  useEffect(() => {
-    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
-  }, [items]);
+  useEffect(() => { scrollToBottom(); }, [messages.length, pending]);
 
-  // Preset-Änderung verwalten
-  const handlePresetChange = useCallback((presetId: string) => {
-    setSelectedPresetId(presetId);
-    localStorage.setItem('selectedPreset', presetId);
-    setShowPersonaPicker(false);
-    
-    // Optional: Chat-Historie löschen für sauberen Kontext
-    const currentPreset = presets.find(p => p.id === presetId);
-    if (currentPreset && items.length > 0) {
-      const shouldClear = confirm(`Preset zu "${currentPreset.name}" geändert. Chat-Historie für sauberen Kontext löschen?`);
-      if (shouldClear) {
-        setItems([]);
-      }
-    }
-  }, [items.length, setItems]);
+  async function onSubmit(e: FormEvent<HTMLFormElement>): Promise<void> {
+    e.preventDefault();
+    const content = input.trim();
+    if (!content || pending) return;
 
-  // Nachricht senden
-  const sendMessage = useCallback(async () => {
-    if (!userMsg.content.trim() || isGenerating) return;
+    const userMsg: ChatMessage = { role: 'user', content };
+    const next = [...messages, userMsg];
+    setMessages(next);
+    setInput('');
+    setPending(true);
+    setError(null);
 
-    // Aktuellen Preset holen
-    const currentPreset = presets.find(p => p.id === selectedPresetId) || presets[0];
-    const systemMessage = { role: "system" as const, content: currentPreset.system };
-    
-    // User-Message zu Chat hinzufügen
-    const newUserMsg: ChatItem = {
-      id: Date.now().toString(),
-      role: 'user',
-      content: userMsg.content,
-      timestamp: new Date()
-    };
-    
-    setItems(prev => [...prev, newUserMsg]);
-    setUserMsg({ role: 'user', content: '' });
-    setIsGenerating(true);
-
-    // Messages für API vorbereiten (mit System-Prompt)
-    const messagesWithSystem = [
-      systemMessage,
-      ...items.map(({ role, content }) => ({ role, content })),
-      { role: "user", content: newUserMsg.content }
-    ];
-
-    console.log('Sending with preset:', currentPreset.name);
-    console.log('System prompt active:', currentPreset.system.substring(0, 100) + '...');
-
-    // AbortController für Abbruch-Funktionalität
-    abortControllerRef.current = new AbortController();
+    const ctrl = new AbortController();
+    abortRef.current = ctrl;
 
     try {
-      const response = await fetch('/api/chat', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          messages: messagesWithSystem,
-          model: selectedModel.id,
-          stream: true,
-          temperature: currentPreset.temperature || 0.7,
-          max_tokens: currentPreset.maxTokens || 4000,
-        }),
-        signal: abortControllerRef.current.signal
-      });
-
-      if (!response.ok) {
-        throw new Error(`HTTP ${response.status}: ${response.statusText}`);
-      }
-
-      // Streaming Response verarbeiten
-      const reader = response.body?.getReader();
-      if (!reader) throw new Error('No response stream available');
-
-      let assistantMsg: ChatItem = {
-        id: (Date.now() + 1).toString(),
-        role: 'assistant',
-        content: '',
-        timestamp: new Date(),
-        model: selectedModel.name
-      };
-
-      setItems(prev => [...prev, assistantMsg]);
-
-      const decoder = new TextDecoder();
-      let buffer = '';
-
-      while (true) {
-        const { done, value } = await reader.read();
-        if (done) break;
-
-        buffer += decoder.decode(value, { stream: true });
-        const lines = buffer.split('\n');
-        buffer = lines.pop() || '';
-
-        for (const line of lines) {
-          if (line.trim() === '' || !line.startsWith('data: ')) continue;
-          
-          const data = line.substring(6);
-          if (data === '[DONE]') break;
-
-          try {
-            const parsed = JSON.parse(data);
-            const content = parsed.choices?.[0]?.delta?.content || '';
-            
-            if (content) {
-              assistantMsg.content += content;
-              setItems(prev => 
-                prev.map(item => 
-                  item.id === assistantMsg.id 
-                    ? { ...item, content: assistantMsg.content }
-                    : item
-                )
-              );
-            }
-          } catch (e) {
-            console.warn('Failed to parse SSE data:', data);
-          }
-        }
-      }
-    } catch (error: any) {
-      if (error.name === 'AbortError') {
-        console.log('Request aborted by user');
-        return;
-      }
-      
-      console.error('Chat error:', error);
-      
-      const errorMsg: ChatItem = {
-        id: (Date.now() + 2).toString(),
-        role: 'assistant',
-        content: `❌ Fehler: ${error.message || 'Unbekannter Fehler beim Senden der Nachricht'}`,
-        timestamp: new Date(),
-        isError: true
-      };
-      
-      setItems(prev => [...prev, errorMsg]);
+      const res = await chat(model, next, ctrl.signal);
+      const assistant: ChatMessage = { role: 'assistant', content: res.content || '(keine Antwort)' };
+      setMessages(m => [...m, assistant]);
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : String(e);
+      setError(msg);
     } finally {
-      setIsGenerating(false);
-      abortControllerRef.current = null;
+      setPending(false);
+      abortRef.current = null;
     }
-  }, [userMsg.content, isGenerating, selectedPresetId, items, selectedModel, setItems, setIsGenerating]);
+  }
 
-  // Generation abbrechen
-  const stopGeneration = useCallback(() => {
-    if (abortControllerRef.current) {
-      abortControllerRef.current.abort();
-      setIsGenerating(false);
-    }
-  }, [setIsGenerating]);
-
-  // Aktueller Preset für Anzeige
-  const currentPreset = presets.find(p => p.id === selectedPresetId) || presets[0];
+  function onAbort(): void {
+    abortRef.current?.abort();
+    setPending(false);
+  }
 
   return (
-    <div className="chat-panel">
-      {/* Header mit Preset und Model Info */}
-      <div className="chat-header">
-        <button 
-          className="preset-button"
-          onClick={() => setShowPersonaPicker(true)}
-          title={`Aktiver Prompt: ${currentPreset.name}`}
-        >
-          <span className="preset-emoji">{currentPreset.emoji}</span>
-          <span className="preset-name">{currentPreset.name}</span>
-        </button>
-        
-        <button 
-          className="model-button"
-          onClick={() => setShowModelPicker(true)}
-          title={`Aktives Model: ${selectedModel.name}`}
-        >
-          {selectedModel.name}
-        </button>
-      </div>
-
-      {/* Chat Messages */}
-      <div className="messages-container">
-        {items.map((item) => (
-          <MessageBubble key={item.id} message={item} />
+    <div style={{ display: 'grid', gridTemplateRows: '1fr auto', height: '100%' }}>
+      <div ref={listRef} style={{ overflow: 'auto', padding: 16 }}>
+        {messages.filter(m => m.role !== 'system').map((m, idx) => (
+          <div key={idx} style={{ marginBottom: 12 }}>
+            <div style={{ fontSize: 12, color: '#9ca3af', textTransform: 'uppercase' }}>{m.role}</div>
+            <div style={{ whiteSpace: 'pre-wrap', background: '#151f2f', border: '1px solid #1f2937', borderRadius: 10, padding: '10px 12px' }}>
+              {m.content}
+            </div>
+          </div>
         ))}
-        {isGenerating && (
-          <div className="typing-indicator">
-            <span></span><span></span><span></span>
+        {pending && (
+          <div>
+            <div style={{ fontSize: 12, color: '#9ca3af', textTransform: 'uppercase' }}>assistant</div>
+            <div style={{ whiteSpace: 'pre-wrap', background: '#151f2f', border: '1px solid #1f2937', borderRadius: 10, padding: '10px 12px' }}>
+              …denke nach
+            </div>
           </div>
         )}
-        <div ref={messagesEndRef} />
       </div>
 
-      {/* Chat Input */}
-      <ChatComposer
-        value={userMsg.content}
-        onChange={(content) => setUserMsg({ role: 'user', content })}
-        onSend={sendMessage}
-        onStop={stopGeneration}
-        disabled={isGenerating}
-        isGenerating={isGenerating}
-        placeholder={`Nachricht an ${currentPreset.name}...`}
-      />
-
-      {/* Modals */}
-      {showPersonaPicker && (
-        <PersonaPicker
-          presets={presets}
-          selectedId={selectedPresetId}
-          onSelect={handlePresetChange}
-          onClose={() => setShowPersonaPicker(false)}
+      <form onSubmit={onSubmit} style={{ display: 'grid', gridTemplateColumns: '1fr auto', gap: 12, padding: 12, borderTop: '1px solid #1f2937' }}>
+        <textarea
+          placeholder="Frage eingeben…"
+          value={input}
+          onChange={(e) => setInput(e.target.value)}
+          onKeyDown={(e) => {
+            if (e.key === 'Enter' && !e.shiftKey) {
+              e.preventDefault();
+              e.currentTarget.form?.requestSubmit();
+            }
+          }}
+          style={{
+            width: '100%', minHeight: 56, maxHeight: 220, resize: 'vertical',
+            padding: '10px 12px', borderRadius: 10, border: '1px solid #1f2937',
+            background: '#0b1324', color: '#e5e7eb', fontSize: 15, lineHeight: 1.5,
+          }}
         />
-      )}
+        <div style={{ display: 'flex', gap: 8, alignItems: 'flex-end' }}>
+          <button
+            type="submit"
+            disabled={pending || !input.trim()}
+            style={{ background: '#3b82f6', color: 'white', border: 'none', padding: '8px 12px', borderRadius: 8, fontWeight: 600, cursor: 'pointer', opacity: (pending || !input.trim()) ? .6 : 1 }}
+          >
+            Senden
+          </button>
+          <button
+            type="button"
+            disabled={!pending}
+            onClick={onAbort}
+            style={{ background: '#1f2937', color: 'white', border: 'none', padding: '8px 12px', borderRadius: 8, fontWeight: 600, cursor: 'pointer', opacity: !pending ? .6 : 1 }}
+          >
+            Abbrechen
+          </button>
+        </div>
+      </form>
 
-      {showModelPicker && (
-        <ModelPicker
-          selectedModel={selectedModel}
-          onModelChange={onModelChange}
-          onClose={() => setShowModelPicker(false)}
-        />
+      {error && (
+        <div style={{ padding: '8px 12px', color: '#ef4444', fontSize: 12 }}>
+          Fehler: {error}
+        </div>
       )}
     </div>
   );
-};
-
-export default ChatPanel;
+}

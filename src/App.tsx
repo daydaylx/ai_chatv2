@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import Header from "./components/Header";
 import SettingsDrawer from "./features/settings/SettingsDrawer";
-import ChatPanel from "./features/chat/ChatPanel";
+import ChatPanel from './components/ChatPanel';
 import { OpenRouterClient } from "./lib/openrouter";
 
 const LS_MODEL = "model_id";

@@ -1,6 +1,6 @@
 {
   "name": "ai-chat-mobile-pwa",
-  "version": "1.0.2",
+  "version": "1.0.3",
   "private": true,
   "description": "Mobile-first PWA für AI-Chat (Vite + React + TypeScript).",
   "type": "module",
@@ -10,7 +10,11 @@
     "preview": "vite preview",
     "lint": "eslint . --ext .ts,.tsx --max-warnings=0",
     "typecheck": "tsc --noEmit",
-    "format": "prettier --write ."
+    "format": "prettier --write .",
+    "persona:list": "node tools/persona-cli.mjs list",
+    "persona:check": "node tools/persona-cli.mjs check",
+    "persona:add": "node tools/persona-cli.mjs add",
+    "persona:rm": "node tools/persona-cli.mjs rm"
   },
   "dependencies": {
     "dexie": "^3.2.7",

@@ -11,9 +11,20 @@ type Props = {
   onKeyChanged?: () => void;
   personaLabel?: string;
   onOpenPersona?: () => void;
+  personaId?: string; // neu: zur Modell-Kompatibilitätsprüfung
 };
 
-export default function SettingsDrawer({ open, onClose, client, modelId, onModelChange, onKeyChanged, personaLabel, onOpenPersona }: Props) {
+export default function SettingsDrawer({
+  open,
+  onClose,
+  client,
+  modelId,
+  onModelChange,
+  onKeyChanged,
+  personaLabel,
+  onOpenPersona,
+  personaId
+}: Props) {
   const [key, setKey] = useState("");
   const panelRef = useRef<HTMLDivElement | null>(null);
   const lastActive = useRef<HTMLElement | null>(null);
@@ -23,9 +34,9 @@ export default function SettingsDrawer({ open, onClose, client, modelId, onModel
       setKey(client.getApiKey());
       lastActive.current = (document.activeElement as HTMLElement) ?? null;
       setTimeout(() => panelRef.current?.focus(), 30);
-      const onKeyEsc = (e: KeyboardEvent) => { if (e.key === "Escape") onClose(); };
-      document.addEventListener("keydown", onKeyEsc);
-      return () => document.removeEventListener("keydown", onKeyEsc);
+      const onKey = (e: KeyboardEvent) => { if (e.key === "Escape") onClose(); };
+      document.addEventListener("keydown", onKey);
+      return () => document.removeEventListener("keydown", onKey);
     } else {
       lastActive.current?.focus?.();
     }
@@ -61,8 +72,15 @@ export default function SettingsDrawer({ open, onClose, client, modelId, onModel
           <section className="block">
             <h3 className="block__title">API-Key</h3>
             <div className="field">
-              <input type="password" placeholder="sk-..." className="input" value={key}
-                     onChange={(e) => setKey(e.target.value)} autoComplete="off" spellCheck={false}/>
+              <input
+                type="password"
+                placeholder="sk-..."
+                className="input"
+                value={key}
+                onChange={(e) => setKey(e.target.value)}
+                autoComplete="off"
+                spellCheck={false}
+              />
             </div>
             <div className="row">
               <button className="btn" onClick={saveKey} disabled={!key.trim()}>Speichern</button>
@@ -72,7 +90,7 @@ export default function SettingsDrawer({ open, onClose, client, modelId, onModel
 
           <section className="block">
             <h3 className="block__title">Modell</h3>
-            <ModelPicker value={modelId || ""} onChange={onModelChange} client={client} />
+            <ModelPicker value={modelId || ""} onChange={onModelChange} client={client} personaId={personaId} />
             <div className="hint">Aktuelles Modell: <code>{modelLabel}</code></div>
           </section>
 

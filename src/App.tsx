@@ -52,6 +52,7 @@ export default function App() {
         onKeyChanged={() => setApiKeyPresent(!!client.getApiKey())}
         personaLabel={personaLabel}
         onOpenPersona={() => { setSettingsOpen(false); setPersonaOpen(true); }}
+        personaId={personaId}
       />
 
       {personaOpen && (

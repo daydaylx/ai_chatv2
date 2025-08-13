@@ -1,2 +1,11 @@
-@import './styles/tokens.css';
-@import './styles/app.css';
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  --radius: 14px; --radius-lg: 18px; --radius-xl: 24px;
+  --glow-blue: 0 0 14px rgba(0,163,255,.22), 0 0 28px rgba(0,115,230,.12);
+  --glow-red:  0 0 14px rgba(255,77,46,.22),  0 0 28px rgba(210,54,28,.12);
+}
+
+html, body, #root { height: 100%; }

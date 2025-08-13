@@ -1,136 +1,51 @@
-/* =========================================
-   Design System: Neon Nova Pro  (default)
-   - Dark-first Neon (Blue × Warm Orange)
-   - Dezentere Glows, bessere Lesbarkeit
-   - Light via prefers-color-scheme
-   - Theme override: [data-theme="noir"] siehe unten
-   ========================================= */
-
+/* ===== Design Tokens (HSL) + Legacy Bridge ===== */
 :root {
-  /* ---- Base Surfaces (Dark) ---- */
-  --bg: #070A14;
-  --bg-elev: #0A0F1F;
-  --surface: #0C1224;
-  --surface-2: #0E142A;
-  --surface-3: #0B1122;
+  --background: 220 40% 3%;
+  --foreground: 210 40% 98%;
+  --card: 220 40% 7%;
+  --card-foreground: 210 40% 98%;
 
-  --text: #EAF2FF;
-  --muted: #9AA7C6;
-  --muted-2: #7E8AA8;
+  --primary: 14 100% 56%;
+  --primary-foreground: 210 40% 98%;
+  --secondary: 217 33% 17%;
+  --secondary-foreground: 210 40% 98%;
 
-  --separator: rgba(255,255,255,.08);
-  --border-weak: rgba(255,255,255,.06);
-  --border-medium: rgba(255,255,255,.10);
-  --border-strong: rgba(255,255,255,.16);
+  --muted: 217 33% 40%;
+  --muted-foreground: 215 20% 70%;
+  --accent: 200 90% 55%;
+  --accent-foreground: 210 40% 98%;
 
-  /* ---- Accent / Secondary ---- */
-  --accent-600: #FF4D2E;  /* für CTAs + User-Bubbles (wärmer, aber reduziert) */
-  --accent-700: #E74426;
-  --accent-800: #C83A1E;
+  --destructive: 0 84% 60%;
+  --destructive-foreground: 210 40% 98%;
+  --border: 217 33% 17%;
+  --input: 217 33% 17%;
+  --ring: var(--primary);
 
-  --secondary: #1E90FF;   /* Links/Highlights */
-
-  /* Status */
-  --success: #10B981;
-  --warn:    #F59E0B;
-  --error:   #EF4444;
-  --info:    #38BDF8;
-
-  /* Chat-Bubbles */
-  --bot:  #101934;  /* leicht heller -> bessere Lesbarkeit */
-  --user: linear-gradient(135deg, #FF6A3A 0%, #E74426 100%);
-  --user-solid: #FF4D2E;
-
-  /* Markdown / UI Detail */
-  --code-bg: #0B1224;
-  --code-border: rgba(255,255,255,.10);
-  --blockquote-bg: rgba(30,144,255,.10);
-  --table-border: rgba(255,255,255,.12);
-  --link: #93C5FD;
-
-  /* Glass & Glow (gezähmt) */
-  --glass: rgba(10,14,28,.52);
-  --glass-strong: rgba(12,18,36,.78);
-  --blur-strength: 10px;  /* globaler Blur-Regler */
-
+  --radius: 14px; --radius-lg: 18px; --radius-xl: 24px;
   --glow-blue: 0 0 14px rgba(0,163,255,.22), 0 0 28px rgba(0,115,230,.12);
   --glow-red:  0 0 14px rgba(255,77,46,.22),  0 0 28px rgba(210,54,28,.12);
 
-  /* Typography */
-  --font-family: Inter, ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, "Apple Color Emoji", "Segoe UI Emoji";
-  --font-mono: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
-
-  --fs-12: 12px; --fs-13: 13px; --fs-14: 14px;
-  --fs-16: 16px; --fs-18: 18px; --fs-20: 20px;
-  --fs-24: 24px; --fs-28: 28px; --fs-32: 32px;
-
-  --lh-tight: 1.4; --lh-base:  1.55; --lh-loose: 1.7;
-  --fw-regular: 400; --fw-medium: 500; --fw-semibold:600; --fw-bold:700;
-
-  /* Spacing */
-  --sp-1: 4px; --sp-1_5: 6px; --sp-2: 8px; --sp-3: 12px; --sp-4: 16px; --sp-5: 20px;
-  --sp-6: 24px; --sp-8: 32px; --sp-10: 40px; --sp-12: 48px; --sp-16: 64px;
-
-  /* Shape & Shadows */
-  --radius-xs: 8px; --radius-sm: 10px; --radius: 14px; --radius-lg: 18px; --radius-xl: 24px; --radius-full: 999px;
-  --shadow-1: 0 1px 2px rgba(0,0,0,.25), 0 2px 6px rgba(0,0,0,.20);
-  --shadow-2: 0 6px 18px rgba(0,0,0,.30);
-  --shadow-3: 0 12px 36px rgba(0,0,0,.40);
-
-  /* Motion & Z */
-  --dur-fast: 110ms; --dur: 180ms; --dur-slow: 260ms;
-  --ease: cubic-bezier(.2,.8,.2,1); --ease-out: cubic-bezier(.16,1,.3,1);
-  --z-sticky: 100; --z-over: 300; --z-modal: 400; --z-toast: 500;
-
-  /* Subtiles SVG-Noise (Anti-Banding) – ~600 B */
-  --noise: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='100' height='100' viewBox='0 0 100 100'><filter id='n'><feTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='3' stitchTiles='stitch'/><feColorMatrix type='saturate' values='0'/><feComponentTransfer><feFuncA type='linear' slope='0.06'/></feComponentTransfer></filter><rect width='100%' height='100%' filter='url(%23n)'/></svg>");
+  --bg: hsl(var(--background));
+  --surface: hsl(var(--card));
+  --text: hsl(var(--foreground));
 }
 
-/* Light Mode – helle Flächen, gleiche Stimmung */
-@media (prefers-color-scheme: light) {
-  :root {
-    --bg: #F6F8FF;
-    --bg-elev: #FFFFFF;
-    --surface: #FFFFFF;
-    --surface-2: #F2F6FF;
-    --surface-3: #FFFFFF;
-    --text: #0B0F1A;
-    --muted: #576071;
-    --muted-2: #6B7280;
-
-    --separator: #E7EAF0;
-    --border-weak: rgba(0,0,0,.06);
-    --border-medium: rgba(0,0,0,.10);
-    --border-strong: rgba(0,0,0,.16);
-
-    --bot: #ECF2FF;
-    --code-bg: #F5F7FF;
-    --code-border: rgba(0,0,0,.08);
-    --blockquote-bg: rgba(30,144,255,.12);
-  }
-}
-
-/* ===== Mobile (Touch) Optimierungen – weniger Blur/Glow ===== */
-@media (hover: none) and (pointer: coarse) {
-  :root{
-    --blur-strength: 6px;
-    --glow-blue: 0 0 10px rgba(0,163,255,.18), 0 0 18px rgba(0,115,230,.10);
-    --glow-red:  0 0 10px rgba(255,77,46,.18),  0 0 18px rgba(210,54,28,.10);
-    --shadow-1: 0 1px 2px rgba(0,0,0,.22), 0 2px 6px rgba(0,0,0,.18);
-  }
-}
-
-/* ========= Alternate Theme: Mono Noir (dezenter, corporate) ========= */
-:root[data-theme="noir"] {
-  --bg: #0B0F1A; --bg-elev:#0E1423; --surface:#101726; --surface-2:#121A2C; --surface-3:#0C1220;
-  --text:#E6EAF2; --muted:#9AA4B2; --muted-2:#7D8796;
-  --separator:#1C2742; --border-weak:rgba(255,255,255,.06); --border-medium:rgba(255,255,255,.10); --border-strong:rgba(255,255,255,.16);
-  --accent-600:#7C3AED; --accent-700:#6D28D9; --accent-800:#5B21B6;
-  --secondary:#4F46E5;
-  --bot:#121A2C;
-  --user: linear-gradient(135deg, #7C3AED 0%, #5B21B6 100%);
-  --user-solid:#7C3AED;
-  --link:#93C5FD;
-  --glow-blue: 0 0 12px rgba(124,58,237,.20), 0 0 24px rgba(91,33,182,.10);
-  --glow-red:  0 0 12px rgba(124,58,237,.18), 0 0 24px rgba(91,33,182,.10);
+.light {
+  --background: 0 0% 100%;
+  --foreground: 220 40% 3%;
+  --card: 0 0% 100%;
+  --card-foreground: 220 40% 3%;
+  --primary: 263 70% 50%;
+  --primary-foreground: 210 40% 98%;
+  --secondary: 210 40% 96%;
+  --secondary-foreground: 220 40% 10%;
+  --muted: 210 40% 96%;
+  --muted-foreground: 215 16% 47%;
+  --accent: 263 70% 50%;
+  --accent-foreground: 210 40% 98%;
+  --destructive: 0 84% 60%;
+  --destructive-foreground: 210 40% 98%;
+  --border: 214 32% 91%;
+  --input: 214 32% 91%;
+  --ring: 263 70% 50%;
 }

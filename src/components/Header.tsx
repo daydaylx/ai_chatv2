@@ -12,32 +12,28 @@ type Props = {
 
 export default function Header({ title = "AI Chat", keySet, modelLabel, onOpenSettings, theme, onToggleTheme }: Props) {
   return (
-    <motion.header 
+    <motion.header
       initial={{ y: -20, opacity: 0 }}
       animate={{ y: 0, opacity: 1 }}
-      className="glass sticky top-0 z-50 h-16 px-4 flex items-center justify-between border-b border-border/50"
+      className="glass sticky top-0 z-50 h-14 px-3 flex items-center justify-between rounded-b-xl"
     >
-      <div className="flex items-center gap-3 min-w-0">
-        <motion.div className="text-xl font-bold text-gradient truncate">
+      <div className="flex items-center gap-2 min-w-0">
+        <motion.div className="text-lg font-bold text-gradient shrink-0">
           {title}
         </motion.div>
         {modelLabel ? (
-          <motion.span 
-            initial={{ scale: 0 }}
-            animate={{ scale: 1 }}
-            className="min-w-0 max-w-[48vw] md:max-w-none px-3 py-1 text-xs font-medium rounded-full bg-primary/10 text-primary border border-primary/20 truncate"
+          <motion.span
+            initial={{ scale: 0.9, opacity: 0 }}
+            animate={{ scale: 1, opacity: 1 }}
+            className="min-w-0 max-w-[56vw] px-2 py-0.5 text-[11px] font-medium rounded-full bg-primary/10 text-primary border border-primary/20 truncate"
             title={modelLabel}
           >
             {modelLabel}
           </motion.span>
         ) : (
-          <motion.span 
-            initial={{ scale: 0 }}
-            animate={{ scale: 1 }}
-            className="px-3 py-1 text-xs font-medium rounded-full bg-destructive/10 text-destructive border border-destructive/20"
-          >
+          <span className="px-2 py-0.5 text-[11px] font-medium rounded-full bg-destructive/10 text-destructive border border-destructive/20">
             Kein Modell
-          </motion.span>
+          </span>
         )}
       </div>
 
@@ -46,7 +42,7 @@ export default function Header({ title = "AI Chat", keySet, modelLabel, onOpenSe
           whileHover={{ scale: 1.05 }}
           whileTap={{ scale: 0.95 }}
           onClick={onToggleTheme}
-          className="w-10 h-10 rounded-xl glass flex items-center justify-center text-muted-foreground hover:text-foreground transition-colors"
+          className="w-9 h-9 rounded-lg glass flex items-center justify-center text-muted-foreground hover:text-foreground transition-colors"
           aria-label="Theme wechseln"
         >
           {theme === 'dark' ? (
@@ -64,7 +60,7 @@ export default function Header({ title = "AI Chat", keySet, modelLabel, onOpenSe
           whileHover={{ scale: 1.05, rotate: 90 }}
           whileTap={{ scale: 0.95 }}
           onClick={onOpenSettings}
-          className="w-10 h-10 rounded-xl glass flex items-center justify-center text-muted-foreground hover:text-foreground transition-colors"
+          className="w-9 h-9 rounded-lg glass flex items-center justify-center text-muted-foreground hover:text-foreground transition-colors"
           aria-label="Einstellungen"
         >
           <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -73,10 +69,7 @@ export default function Header({ title = "AI Chat", keySet, modelLabel, onOpenSe
           </svg>
         </motion.button>
 
-        <div className={clsx(
-          "w-2 h-2 rounded-full",
-          keySet ? "bg-green-500 animate-pulse-glow" : "bg-destructive"
-        )} />
+        <div className={clsx("w-2 h-2 rounded-full", keySet ? "bg-green-500 animate-pulse" : "bg-destructive")} />
       </div>
     </motion.header>
   );

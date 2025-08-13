@@ -1,7 +1,9 @@
 import { useEffect, useMemo, useRef, useState, type KeyboardEvent as ReactKeyboardEvent } from "react";
+import { motion, AnimatePresence } from "framer-motion";
 import type { ChatMessage } from "../../lib/openrouter";
 import { OpenRouterClient } from "../../lib/openrouter";
 import { PRESETS } from "../../lib/presets";
+import clsx from "clsx";
 
 type Bubble = ChatMessage & { id: string; ts: number };
 
@@ -19,14 +21,12 @@ function uuid() {
 }
 
 export default function ChatPanel({ client, modelId, apiKeyPresent, onOpenSettings, personaId }: Props) {
-  // WICHTIG: Keine System-Bubble mehr im Verlauf ablegen.
-  const [items, setItems] = useState<Bubble[]>([]); // enthält NUR user/assistant
+  const [items, setItems] = useState<Bubble[]>([]);
   const [input, setInput] = useState("");
   const [busy, setBusy] = useState(false);
-  const listRef = useRef<HTMLDivElement | null>(null);
+  const scrollRef = useRef<HTMLDivElement | null>(null);
   const taRef = useRef<HTMLTextAreaElement | null>(null);
 
-  // Laufzeit-„System“-Prompt aus aktuellem Stil; wird NUR an die API geschickt, nicht gerendert
   const systemMsg = useMemo<ChatMessage | null>(() => {
     const preset = PRESETS.find(p => p.id === personaId);
     return preset ? { role: "system", content: preset.system } : null;
@@ -38,6 +38,7 @@ export default function ChatPanel({ client, modelId, apiKeyPresent, onOpenSettin
     return "";
   }, [apiKeyPresent, modelId]);
 
+  // autosize textarea
   useEffect(() => {
     const ta = taRef.current;
     if (!ta) return;
@@ -47,8 +48,9 @@ export default function ChatPanel({ client, modelId, apiKeyPresent, onOpenSettin
     return () => ta.removeEventListener("input", resize);
   }, []);
 
+  // autoscroll to bottom
   useEffect(() => {
-    const el = listRef.current;
+    const el = scrollRef.current;
     if (!el) return;
     el.scrollTop = el.scrollHeight + 1000;
   }, [items, busy]);
@@ -60,14 +62,12 @@ export default function ChatPanel({ client, modelId, apiKeyPresent, onOpenSettin
     const trimmed = input.trim();
     const userMsg: Bubble = { id: uuid(), role: "user", content: trimmed, ts: Date.now() };
 
-    // Snapshot der bisherigen History (ohne system), dann UI sofort updaten
     const historySnapshot = items;
     setInput("");
     setItems(prev => [...prev, userMsg]);
     setBusy(true);
 
     try {
-      // Nur hier den System-Prompt voranstellen – NICHT rendern
       const historyMsgs = historySnapshot.map(({ role, content }) => ({ role, content })) as ChatMessage[];
       const baseMsgs = systemMsg ? [systemMsg, ...historyMsgs] : historyMsgs;
 
@@ -96,52 +96,114 @@ export default function ChatPanel({ client, modelId, apiKeyPresent, onOpenSettin
     }
   }
 
-  // Nur user/assistant rendern; falls Altzustände "system" enthalten, werden sie unterdrückt
   const renderItems = items.filter(m => m.role !== "system");
 
+  /* GRID: messages (1fr) + composer (auto) -> composer bleibt immer unten */
   return (
-    <div className="chat-root">
-      {disabledReason && (
-        <div className="notice">
-          <span>{disabledReason}</span>
-          <button className="btn" onClick={onOpenSettings}>Einstellungen</button>
-        </div>
-      )}
-
-      <div className="chat-list" ref={listRef} aria-live="polite" aria-label="Chat-Verlauf">
-        {renderItems.map(item => (
-          <div key={item.id} className={`bubble ${item.role === "user" ? "bubble--user" : "bubble--bot"}`}>
-            <div className="bubble__txt">{item.content}</div>
-            <div className={`bubble__meta ${item.role === "user" ? "meta--r" : "meta--l"}`}>
-              {new Date(item.ts).toLocaleTimeString()}
+    <div className="h-full grid grid-rows-[1fr_auto]">
+      {/* Warn-Bar */}
+      <AnimatePresence>
+        {disabledReason && (
+          <motion.div
+            initial={{ height: 0, opacity: 0 }}
+            animate={{ height: "auto", opacity: 1 }}
+            exit={{ height: 0, opacity: 0 }}
+            className="row-span-1 overflow-hidden"
+          >
+            <div className="bg-destructive/10 border-b border-destructive/20 px-4 py-3 flex items-center justify-between">
+              <span className="text-sm text-destructive">{disabledReason}</span>
+              <button
+                onClick={onOpenSettings}
+                className="px-3 py-1 text-xs font-medium rounded-lg bg-destructive/20 hover:bg-destructive/30 text-destructive transition-colors"
+              >
+                Einstellungen
+              </button>
             </div>
-          </div>
-        ))}
-        {busy && (
-          <div className="bubble bubble--bot">
-            <div className="bubble__dots" aria-label="Antwort wird erzeugt">
-              <span className="dot" /><span className="dot" /><span className="dot" />
-            </div>
-          </div>
+          </motion.div>
         )}
+      </AnimatePresence>
+
+      {/* Messages */}
+      <div ref={scrollRef} className="overflow-y-auto px-3 py-4">
+        <div className="max-w-3xl mx-auto space-y-3">
+          <AnimatePresence mode="popLayout">
+            {renderItems.map((item, index) => (
+              <motion.div
+                key={item.id}
+                initial={{ opacity: 0, y: 16 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0, y: -16 }}
+                transition={{ duration: 0.25, delay: index * 0.03 }}
+                className={clsx("flex", item.role === "user" ? "justify-end" : "justify-start")}
+              >
+                <div
+                  className={clsx(
+                    "max-w-[88%] md:max-w-[70%] px-4 py-3 rounded-2xl text-sm md:text-base",
+                    item.role === "user"
+                      ? "bg-gradient-to-br from-primary to-primary/80 text-white ml-10"
+                      : "glass mr-10"
+                  )}
+                >
+                  <div className="whitespace-pre-wrap break-words">{item.content}</div>
+                  <div className={clsx("text-[11px] mt-2 opacity-60", item.role === "user" ? "text-right" : "text-left")}>
+                    {new Date(item.ts).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}
+                  </div>
+                </div>
+              </motion.div>
+            ))}
+          </AnimatePresence>
+
+          {busy && (
+            <motion.div initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} className="flex justify-start">
+              <div className="glass px-4 py-3 rounded-2xl mr-10">
+                <div className="loading-dots flex gap-1">
+                  <span className="w-2 h-2 bg-muted-foreground rounded-full" />
+                  <span className="w-2 h-2 bg-muted-foreground rounded-full" />
+                  <span className="w-2 h-2 bg-muted-foreground rounded-full" />
+                </div>
+              </div>
+            </motion.div>
+          )}
+        </div>
       </div>
 
-      <div className="composer" role="group" aria-label="Nachricht schreiben">
-        <textarea
-          ref={taRef}
-          rows={1}
-          className="composer__input"
-          placeholder="Nachricht schreiben…"
-          value={input}
-          onChange={(e) => setInput(e.target.value)}
-          onKeyDown={handleKey}
-          disabled={!!disabledReason || busy}
-          inputMode="text"
-        />
-        <button className="btn btn--send" onClick={send} disabled={!!disabledReason || busy || !input.trim()} aria-label="Senden">
-          <svg width="22" height="22" viewBox="0 0 24 24" aria-hidden="true"><path d="M2 21l21-9L2 3l5 8-5 10zm5-10 13-1L7 11Zm0 0 13 1L7 11Z" fill="currentColor"/></svg>
-        </button>
-      </div>
+      {/* Composer – sticky inkl. Safe-Area-Padding */}
+      <motion.div
+        initial={{ y: 20, opacity: 0 }}
+        animate={{ y: 0, opacity: 1 }}
+        className="glass-heavy border-t border-border/50 p-3 sticky bottom-0 pb-[calc(var(--safe-bottom)+12px)]"
+      >
+        <div className="max-w-3xl mx-auto flex items-end gap-2">
+          <textarea
+            ref={taRef}
+            rows={1}
+            className="flex-1 min-h-[44px] max-h-[160px] px-3 py-3 bg-secondary/50 border border-border/50 rounded-xl resize-none placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary/50 focus:border-primary/50 transition-all"
+            placeholder="Nachricht schreiben..."
+            value={input}
+            onChange={(e) => setInput(e.target.value)}
+            onKeyDown={handleKey}
+            disabled={!!disabledReason || busy}
+            aria-label="Nachricht"
+          />
+          <motion.button
+            whileHover={{ scale: 1.05 }}
+            whileTap={{ scale: 0.95 }}
+            onClick={send}
+            disabled={!!disabledReason || busy || !input.trim()}
+            className={clsx(
+              "w-12 h-12 rounded-xl flex items-center justify-center transition-all shrink-0",
+              (!disabledReason && !busy && input.trim())
+                ? "bg-gradient-to-br from-primary to-primary/80 text-white hover:glow-sm"
+                : "bg-secondary/50 text-muted-foreground opacity-50 cursor-not-allowed"
+            )}
+            aria-label="Senden"
+          >
+            <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8" />
+            </svg>
+          </motion.button>
+        </div>
+      </motion.div>
     </div>
   );
 }

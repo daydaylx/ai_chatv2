@@ -2,6 +2,7 @@
 @tailwind components;
 @tailwind utilities;
 
+/* ---------- DESIGN TOKENS (HSL Variablen) ---------- */
 @layer base {
   :root {
     --background: 220 40% 3%;
@@ -22,6 +23,7 @@
     --input: 217 33% 17%;
     --ring: 263 70% 50%;
   }
+
   .light {
     --background: 0 0% 100%;
     --foreground: 220 40% 3%;
@@ -41,14 +43,43 @@
     --input: 214 32% 91%;
     --ring: 263 70% 50%;
   }
-  body {
-    @apply bg-background text-foreground antialiased;
-  }
 }
 
-/* kleine Helfer */
-@layer utilities {
-  .glass { @apply bg-card/30 backdrop-blur-xl border border-white/10 rounded-xl; }
-  .glass-heavy { @apply bg-card/50 backdrop-blur-2xl border border-white/20 rounded-xl; }
-  .text-gradient { @apply bg-gradient-to-r from-primary via-purple-400 to-pink-400 bg-clip-text text-transparent; }
+/* ---------- BASE / RESET ---------- */
+@layer base {
+  * { @apply border-border; }
+  html, body, #root { height: 100%; }
+  body { @apply bg-background text-foreground; font-feature-settings: "rlig" 1, "calt" 1; }
+
+  /* Mobile safe-area helper */
+  :root {
+    --safe-top: env(safe-area-inset-top);
+    --safe-bottom: env(safe-area-inset-bottom);
+  }
+
+  /* Form control reset to avoid iOS/Android native look */
+  input, textarea, select, button {
+    -webkit-appearance: none;
+    appearance: none;
+    font: inherit;
+    color: inherit;
+    background-color: transparent;
+  }
+
+  textarea::placeholder, input::placeholder { @apply text-muted-foreground; }
 }
+
+/* ---------- UTILITIES ---------- */
+@layer utilities {
+  .glass { @apply bg-card/30 backdrop-blur-xl border border-white/10; }
+  .glass-heavy { @apply bg-card/50 backdrop-blur-2xl border border-white/20; }
+  .text-gradient { @apply bg-gradient-to-r from-primary via-purple-400 to-pink-400 bg-clip-text text-transparent; }
+  .glow-sm { @apply shadow-[0_0_15px_rgba(139,92,246,0.2)]; }
+
+  /* Scrollbar (optional) */
+  ::-webkit-scrollbar { width: 6px; height: 6px; }
+  ::-webkit-scrollbar-thumb { @apply bg-muted/30 rounded-full; }
+}
+
+/* Focus ring */
+*:focus-visible { @apply outline-none ring-2 ring-ring ring-offset-2 ring-offset-background; }

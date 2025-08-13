@@ -1,11 +1,83 @@
-@tailwind base;
-@tailwind components;
-@tailwind utilities;
-
+/* Basisfarben für Dark Mode */
 :root {
-  --radius: 14px; --radius-lg: 18px; --radius-xl: 24px;
-  --glow-blue: 0 0 14px rgba(0,163,255,.22), 0 0 28px rgba(0,115,230,.12);
-  --glow-red:  0 0 14px rgba(255,77,46,.22),  0 0 28px rgba(210,54,28,.12);
+  --primary: #4f8cff;
+  --primary-rgb: 79, 140, 255;
+  --secondary: #1c1f26;
+  --border: rgba(255,255,255,0.1);
+  --text: #f5f5f5;
+  --muted: #a1a1a1;
+  --accent: #4f8cff;
 }
 
-html, body, #root { height: 100%; }
+/* Dark Mode Standard */
+html {
+  background: var(--secondary);
+  color: var(--text);
+  font-family: system-ui, sans-serif;
+}
+
+/* Inputs & Buttons */
+input, select, button, textarea {
+  font-family: inherit;
+  font-size: 15px;
+}
+
+input, select, textarea {
+  background: var(--secondary);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 10px 12px;
+  color: var(--text);
+}
+
+input:focus, select:focus, textarea:focus {
+  outline: none;
+  border-color: var(--accent);
+  box-shadow: 0 0 0 2px rgba(var(--primary-rgb), 0.3);
+}
+
+button {
+  cursor: pointer;
+  border: none;
+  border-radius: 10px;
+  padding: 10px 14px;
+  font-weight: 500;
+  background: var(--primary);
+  color: white;
+}
+
+button:hover {
+  background: #3c6cd9;
+}
+
+/* Kartenlayout */
+.card {
+  background: var(--secondary);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 14px;
+}
+
+/* Mobile Optimierungen */
+@media (max-width: 768px) {
+  html, body {
+    font-size: 15px;
+    -webkit-tap-highlight-color: transparent;
+  }
+  input, select, textarea, button {
+    font-size: 16px; /* verhindert iOS-Zoom */
+  }
+  .card {
+    padding: 12px;
+  }
+}
+
+/* Scrollbar minimalistisch */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+::-webkit-scrollbar-thumb {
+  background: var(--border);
+  border-radius: 3px;
+}

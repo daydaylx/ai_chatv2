@@ -9,7 +9,7 @@ export type OpenRouterModel = {
   pricing?: any;
 };
 
-const BASE = 'https://openrouter.ai/api/v1'\;
+const BASE = 'https://openrouter.ai/api/v1';
 const LS_KEY = 'openrouter_api_key';
 
 function envKey(): string {
@@ -40,12 +40,19 @@ export class OpenRouterClient {
     const headers: Record<string,string> = { 'Accept':'application/json' };
     const auth = authHeader();
     if (auth) headers['Authorization'] = auth;
+
     const res = await fetch(`${BASE}/models`, { headers });
     if (!res.ok) {
       let msg = `OpenRouter Fehler ${res.status}`;
-      try { const j:any = await ensureJson<any>(res); msg = j?.error?.message || msg; } catch {}
+      try {
+        const j: any = await ensureJson<any>(res);
+        msg = j?.error?.message || msg;
+      } catch (e) {
+        void e; // JSON nicht parsebar – Standardfehlermeldung beibehalten
+      }
       throw new Error(msg);
     }
+
     const data: any = await ensureJson<any>(res);
     const list = data?.data ?? [];
     return list.map((m: any) => {
@@ -70,18 +77,26 @@ export class OpenRouterClient {
     const headers: Record<string,string> = { 'Accept':'application/json', 'Content-Type':'application/json' };
     const auth = authHeader();
     if (auth) headers['Authorization'] = auth;
+
     const body = {
       model: opts.model,
       messages: opts.messages,
       temperature: opts.temperature ?? 0.7,
       max_tokens: opts.max_tokens ?? 1024
     };
+
     const res = await fetch(`${BASE}/chat/completions`, { method:'POST', headers, body: JSON.stringify(body) });
     if (!res.ok) {
       let msg = `OpenRouter Fehler ${res.status}`;
-      try { const j:any = await ensureJson<any>(res); msg = j?.error?.message || msg; } catch {}
+      try {
+        const j: any = await ensureJson<any>(res);
+        msg = j?.error?.message || msg;
+      } catch (e) {
+        void e; // JSON nicht parsebar – Standardfehlermeldung beibehalten
+      }
       throw new Error(msg);
     }
+
     const data: any = await ensureJson<any>(res);
     const text = data?.choices?.[0]?.message?.content ?? '';
     return { content: String(text) };

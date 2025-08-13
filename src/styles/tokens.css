@@ -1,0 +1,124 @@
+/* Design System: Mono-Noir – zentrale Tokens (Dark default, Light via prefers-color-scheme) */
+:root {
+  /* Farben */
+  --bg: #0B0F1A;
+  --surface: #101726;
+  --text: #E6EAF2;
+  --muted: #9AA4B2;
+
+  --accent: #7C3AED;
+  --accent-hover: #6D28D9;
+  --accent-press: #5B21B6;
+
+  --success: #10B981;
+  --warn: #F59E0B;
+  --error: #EF4444;
+
+  --separator: #1C2742;
+  --border-weak: rgba(255, 255, 255, 0.06);
+  --border-medium: rgba(255, 255, 255, 0.08);
+  --border-strong: rgba(255, 255, 255, 0.12);
+
+  /* Bubbles */
+  --bot: #121a2c;
+  --user: linear-gradient(135deg, var(--accent) 0%, var(--accent-press) 100%);
+
+  /* Typografie */
+  --font-family: -apple-system, BlinkMacSystemFont, 'Inter', 'Segoe UI', 'Roboto', 'Helvetica Neue', 'Arial', system-ui, sans-serif;
+  --font-size-xs: 12px;
+  --font-size-sm: 14px;
+  --font-size-base: 16px;
+  --font-size-lg: 20px;
+  --font-size-xl: 24px;
+  --font-size-2xl: 32px;
+
+  --line-height-tight: 1.45;
+  --line-height-base: 1.55;
+  --line-height-relaxed: 1.6;
+
+  --font-weight-normal: 400;
+  --font-weight-medium: 500;
+  --font-weight-semibold: 600;
+  --font-weight-bold: 700;
+
+  /* Spacing (4pt Grid) */
+  --space-1: 4px;
+  --space-2: 8px;
+  --space-3: 12px;
+  --space-4: 16px;
+  --space-5: 20px;
+  --space-6: 24px;
+  --space-8: 32px;
+  --space-10: 40px;
+  --space-12: 48px;
+  --space-16: 64px;
+
+  /* Radius, Schatten, Motion, Z */
+  --radius: 14px;
+  --radius-btn: 12px;
+  --radius-input: 10px;
+  --radius-sm: 8px;
+  --radius-lg: 18px;
+  --radius-xl: 24px;
+  --radius-full: 999px;
+
+  --shadow-1: 0 1px 2px rgba(0, 0, 0, 0.2), 0 2px 6px rgba(0, 0, 0, 0.15);
+  --shadow-2: 0 6px 20px rgba(0, 0, 0, 0.30);
+  --shadow-3: 0 12px 40px rgba(0, 0, 0, 0.40);
+  --shadow-glow: 0 0 24px rgba(124, 58, 237, 0.3);
+
+  --duration-fast: 120ms;
+  --duration-normal: 180ms;
+  --duration-slow: 280ms;
+  --duration-slower: 380ms;
+  --easing: cubic-bezier(0.2, 0.8, 0.2, 1);
+  --easing-bounce: cubic-bezier(0.68, -0.55, 0.265, 1.55);
+
+  --z-base: 1;
+  --z-dropdown: 100;
+  --z-sticky: 200;
+  --z-overlay: 300;
+  --z-modal: 400;
+  --z-toast: 500;
+}
+
+/* Light Mode */
+@media (prefers-color-scheme: light) {
+  :root {
+    --bg: #FAFAFA;
+    --surface: #FFFFFF;
+    --text: #0B0F1A;
+    --muted: #64748B;
+    --separator: #E7EAF0;
+
+    --border-weak: rgba(0, 0, 0, 0.06);
+    --border-medium: rgba(0, 0, 0, 0.08);
+    --border-strong: rgba(0, 0, 0, 0.12);
+
+    --shadow-1: 0 1px 2px rgba(0, 0, 0, 0.08), 0 2px 4px rgba(0, 0, 0, 0.06);
+    --shadow-2: 0 6px 20px rgba(0, 0, 0, 0.10);
+    --shadow-3: 0 12px 40px rgba(0, 0, 0, 0.15);
+    --shadow-glow: 0 0 24px rgba(124, 58, 237, 0.2);
+
+    --bot: #F6F7FA;
+  }
+}
+
+/* Reduced motion */
+@media (prefers-reduced-motion: reduce) {
+  :root {
+    --duration-fast: 0ms;
+    --duration-normal: 0ms;
+    --duration-slow: 0ms;
+    --duration-slower: 0ms;
+  }
+}
+
+/* High contrast tweak */
+@media (prefers-contrast: high) {
+  :root {
+    --border-weak: rgba(255, 255, 255, 0.15);
+    --border-medium: rgba(255, 255, 255, 0.20);
+    --border-strong: rgba(255, 255, 255, 0.30);
+  }
+}

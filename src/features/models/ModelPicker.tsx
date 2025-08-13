@@ -65,15 +65,18 @@ export function ModelPicker({ value, onChange, client, personaId }: Props) {
         aria-label="Modell wählen"
       >
         <option value="">— Modell wählen —</option>
-        {withCompat.map(({ model: m, id, allowed }, idx) => (
-          <option
-            key={id || m.name || `m-${idx}`}
-            value={id}
-            disabled={!allowed || !id}
-          >
-            {(m.name ?? id || "Unbenanntes Modell") + (!allowed ? " (inkompatibel)" : "")}
-          </option>
-        ))}
+        {withCompat.map(({ model: m, id, allowed }, idx) => {
+          const label = (m.name ?? id) || "Unbenanntes Modell";
+          return (
+            <option
+              key={id || m.name || `m-${idx}`}
+              value={id}
+              disabled={!allowed || !id}
+            >
+              {label + (!allowed ? " (inkompatibel)" : "")}
+            </option>
+          );
+        })}
       </select>
 
       {loading && (

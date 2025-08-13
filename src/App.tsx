@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
+import { AnimatePresence } from "framer-motion";
 import Header from "./components/Header";
 import SettingsDrawer from "./features/settings/SettingsDrawer";
 import ChatPanel from "./features/chat/ChatPanel";
@@ -21,28 +22,20 @@ export default function App() {
     () => (localStorage.getItem(LS_THEME) as "dark" | "light") || "dark"
   );
 
-  useEffect(() => {
-    localStorage.setItem(LS_MODEL, modelId || "");
-  }, [modelId]);
-
-  useEffect(() => {
-    localStorage.setItem(LS_PERSONA, personaId || "");
-  }, [personaId]);
-
+  useEffect(() => { localStorage.setItem(LS_MODEL, modelId || ""); }, [modelId]);
+  useEffect(() => { localStorage.setItem(LS_PERSONA, personaId || ""); }, [personaId]);
   useEffect(() => {
     localStorage.setItem(LS_THEME, theme);
-    const root = document.documentElement;
-    root.classList.remove("dark", "light");
-    root.classList.add(theme);
+    document.documentElement.className = theme;
   }, [theme]);
 
   const currentPreset = PRESETS.find((p) => p.id === personaId);
-  const personaLabel = currentPreset?.label;
+  const personaLabel = currentPreset ? currentPreset.label : undefined;
 
-  const toggleTheme = () => setTheme((t) => (t === "dark" ? "light" : "dark"));
+  const toggleTheme = () => setTheme((p) => (p === "dark" ? "light" : "dark"));
 
   return (
-    <div className="flex flex-col h-screen bg-gradient-to-br from-background via-background to-secondary/20">
+    <div className="flex flex-col h-screen">
       <Header
         title="AI Chat"
         keySet={apiKeyPresent}
@@ -53,7 +46,6 @@ export default function App() {
       />
 
       <main className="flex-1 overflow-hidden relative">
-        <div className="absolute inset-0 bg-gradient-to-t from-primary/5 via-transparent to-transparent pointer-events-none" />
         <ChatPanel
           key={personaId}
           client={client}
@@ -64,31 +56,32 @@ export default function App() {
         />
       </main>
 
-      {settingsOpen && (
-        <SettingsDrawer
-          open={settingsOpen}
-          onClose={() => setSettingsOpen(false)}
-          client={client}
-          modelId={modelId}
-          onModelChange={setModelId}
-          onKeyChanged={() => setApiKeyPresent(!!client.getApiKey())}
-          personaLabel={personaLabel}
-          onOpenPersona={() => {
-            setSettingsOpen(false);
-            setPersonaOpen(true);
-          }}
-          personaId={personaId}
-        />
-      )}
+      <AnimatePresence>
+        {settingsOpen && (
+          <SettingsDrawer
+            open={settingsOpen}
+            onClose={() => setSettingsOpen(false)}
+            client={client}
+            modelId={modelId}
+            onModelChange={setModelId}
+            onKeyChanged={() => setApiKeyPresent(!!client.getApiKey())}
+            personaLabel={personaLabel}
+            onOpenPersona={() => { setSettingsOpen(false); setPersonaOpen(true); }}
+            personaId={personaId}
+          />
+        )}
+      </AnimatePresence>
 
-      {personaOpen && (
-        <PersonaPicker
-          visible={personaOpen}
-          currentId={personaId}
-          onPick={(id) => setPersonaId(id)}
-          onClose={() => setPersonaOpen(false)}
-        />
-      )}
+      <AnimatePresence>
+        {personaOpen && (
+          <PersonaPicker
+            visible={personaOpen}
+            currentId={personaId}
+            onPick={(id) => setPersonaId(id)}
+            onClose={() => setPersonaOpen(false)}
+          />
+        )}
+      </AnimatePresence>
     </div>
   );
 }

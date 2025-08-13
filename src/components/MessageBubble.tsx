@@ -9,7 +9,11 @@ export default function MessageBubble({ msg }: Props) {
   const isUser = msg.role === "user";
   return (
     <div className={`bubble-row ${isUser ? "right" : "left"}`}>
-      {!isUser && <div className="avatar" aria-hidden><span>🤖</span></div>}
+      {!isUser && (
+        <div className="avatar" aria-hidden>
+          <span>🤖</span>
+        </div>
+      )}
       <div className={`bubble ${isUser ? "user" : "assistant"}`}>
         <div className="bubble-content">{msg.content}</div>
         <div className="bubble-meta">

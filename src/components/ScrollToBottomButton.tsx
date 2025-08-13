@@ -1,5 +1,10 @@
 import React from "react";
-interface Props { visible: boolean; onClick: () => void; }
+
+interface Props {
+  visible: boolean;
+  onClick: () => void;
+}
+
 export default function ScrollToBottomButton({ visible, onClick }: Props) {
   return (
     <button

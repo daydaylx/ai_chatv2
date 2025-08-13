@@ -30,7 +30,10 @@ export default function ChatListDrawer({
       </div>
 
       <div className="drawer-content">
-        {chats.length === 0 && <div className="drawer-empty">Noch keine Konversationen.</div>}
+        {chats.length === 0 && (
+          <div className="drawer-empty">Noch keine Konversationen.</div>
+        )}
+
         <ul className="chat-list">
           {chats.map((c) => (
             <li key={c.id}>

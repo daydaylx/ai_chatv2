@@ -1,14 +1,16 @@
-import React from "react";
-import ReactDOM from "react-dom/client";
-import App from "./App";
-import "./index.css";
-import "./styles/tokens.css";
+import React from 'react';
+import ReactDOM from 'react-dom/client';
+import App from './App';
+import './styles/globals.css';
+import './registerSW'; // Kill-Switch/Unregister runs on import (side-effect)
 
-const el = document.getElementById("root");
-if (!el) throw new Error("#root not found");
+const rootEl = document.getElementById('root');
+if (!rootEl) {
+  throw new Error('Root-Element #root nicht gefunden. Prüfe index.html.');
+}
 
-ReactDOM.createRoot(el).render(
+ReactDOM.createRoot(rootEl).render(
   <React.StrictMode>
     <App />
-  </React.StrictMode>
+  </React.StrictMode>,
 );

@@ -1,27 +1,83 @@
+import { motion } from "framer-motion";
+import clsx from "clsx";
+
 type Props = {
   title?: string;
   keySet: boolean;
   modelLabel?: string;
   onOpenSettings: () => void;
+  theme: 'dark' | 'light';
+  onToggleTheme: () => void;
 };
 
-export default function Header({ title = "AI Chat", keySet, modelLabel, onOpenSettings }: Props) {
+export default function Header({ title = "AI Chat", keySet, modelLabel, onOpenSettings, theme, onToggleTheme }: Props) {
   return (
-    <header className="m-header">
-      <div className="m-header__title" title={title}>{title}</div>
-      <div className="m-header__right">
+    <motion.header 
+      initial={{ y: -20, opacity: 0 }}
+      animate={{ y: 0, opacity: 1 }}
+      className="glass sticky top-0 z-50 h-16 px-4 flex items-center justify-between border-b border-border/50"
+    >
+      <div className="flex items-center gap-3 min-w-0">
+        <motion.div className="text-xl font-bold text-gradient truncate">
+          {title}
+        </motion.div>
         {modelLabel ? (
-          <span className="badge" title={`Modell: ${modelLabel}`}>{modelLabel}</span>
+          <motion.span 
+            initial={{ scale: 0 }}
+            animate={{ scale: 1 }}
+            className="min-w-0 max-w-[48vw] md:max-w-none px-3 py-1 text-xs font-medium rounded-full bg-primary/10 text-primary border border-primary/20 truncate"
+            title={modelLabel}
+          >
+            {modelLabel}
+          </motion.span>
         ) : (
-          <span className="badge badge--warn" title="Kein Modell ausgewählt">kein Modell</span>
+          <motion.span 
+            initial={{ scale: 0 }}
+            animate={{ scale: 1 }}
+            className="px-3 py-1 text-xs font-medium rounded-full bg-destructive/10 text-destructive border border-destructive/20"
+          >
+            Kein Modell
+          </motion.span>
         )}
-        <button className="m-icon-btn" onClick={onOpenSettings} aria-label="Einstellungen">
-          <svg width="22" height="22" viewBox="0 0 24 24" aria-hidden="true">
-            <path d="M12 15.5a3.5 3.5 0 1 0 0-7 3.5 3.5 0 0 0 0 7Zm7.4-2.7 1.7-1a.5.5 0 0 0 .2-.7l-1.6-2.7a.5.5 0 0 0-.7-.2l-1.7 1a7.6 7.6 0 0 0-1.6-.9l-.3-2a.5.5 0 0 0-.5-.4h-3.2a.5.5 0 0 0-.5.4l-.3 2a7.6 7.6 0 0 0-1.6.9l-1.7-1a.5.5 0 0 0-.7.2L3.7 11a.5.5 0 0 0 .2.7l1.7 1a7.2 7.2 0 0 0 0 1.8l-1.7 1a.5.5 0 0 0-.2.7l1.6 2.7c.1.2.4.3.7.2l1.7-1c.5.3 1 .6 1.6.9l.3 2c.1.2.3.4.5.4h3.2c.2 0 .4-.2.5-.4l.3-2c.6-.3 1.1-.6 1.6-.9l1.7 1c.3.1.6 0 .7-.2l1.6-2.7a.5.5 0 0 0-.2-.7l-1.7-1c.1-.6.2-1.2.2-1.8Z" fill="currentColor"/>
-          </svg>
-        </button>
-        <span className={keySet ? "dot dot--ok" : "dot dot--bad"} title={keySet ? "API-Key gesetzt" : "Kein API-Key"} />
       </div>
-    </header>
+
+      <div className="flex items-center gap-2">
+        <motion.button
+          whileHover={{ scale: 1.05 }}
+          whileTap={{ scale: 0.95 }}
+          onClick={onToggleTheme}
+          className="w-10 h-10 rounded-xl glass flex items-center justify-center text-muted-foreground hover:text-foreground transition-colors"
+          aria-label="Theme wechseln"
+        >
+          {theme === 'dark' ? (
+            <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364 6.364l-.707-.707M6.343 6.343l-.707-.707m12.728 0l-.707.707M6.343 17.657l-.707.707M16 12a4 4 0 11-8 0 4 4 0 018 0z" />
+            </svg>
+          ) : (
+            <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z" />
+            </svg>
+          )}
+        </motion.button>
+
+        <motion.button
+          whileHover={{ scale: 1.05, rotate: 90 }}
+          whileTap={{ scale: 0.95 }}
+          onClick={onOpenSettings}
+          className="w-10 h-10 rounded-xl glass flex items-center justify-center text-muted-foreground hover:text-foreground transition-colors"
+          aria-label="Einstellungen"
+        >
+          <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+          </svg>
+        </motion.button>
+
+        <div className={clsx(
+          "w-2 h-2 rounded-full",
+          keySet ? "bg-green-500 animate-pulse-glow" : "bg-destructive"
+        )} />
+      </div>
+    </motion.header>
   );
 }

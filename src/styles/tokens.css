@@ -1,83 +1,121 @@
-/* Design System: Mono-Noir – zentrale Tokens (Dark default, Light via prefers-color-scheme) */
+/* ===============================
+   Design System: "Noir Pro"
+   - Dark first, Light via prefers-color-scheme
+   - Farbrollen, Typo-Skala, Motion, Shape
+   =============================== */
+
 :root {
-  /* Farben */
+  /* ---- Farben (Dark Default) ---- */
   --bg: #0B0F1A;
+  --bg-elev: #0E1423;
   --surface: #101726;
+  --surface-2: #121A2C;
+  --surface-3: #0C1220;
   --text: #E6EAF2;
   --muted: #9AA4B2;
+  --muted-2: #7D8796;
 
+  /* Akzent-Palette */
   --accent: #7C3AED;
-  --accent-hover: #6D28D9;
-  --accent-press: #5B21B6;
+  --accent-50: #F5F3FF;
+  --accent-100: #EDE9FE;
+  --accent-200: #DDD6FE;
+  --accent-300: #C4B5FD;
+  --accent-400: #A78BFA;
+  --accent-500: #8B5CF6;
+  --accent-600: #7C3AED; /* primary */
+  --accent-700: #6D28D9;
+  --accent-800: #5B21B6;
+  --accent-900: #4C1D95;
 
+  /* Statusfarben */
   --success: #10B981;
-  --warn: #F59E0B;
-  --error: #EF4444;
+  --warn:    #F59E0B;
+  --error:   #EF4444;
+  --info:    #38BDF8;
 
+  /* Linien/Borders */
   --separator: #1C2742;
-  --border-weak: rgba(255, 255, 255, 0.06);
-  --border-medium: rgba(255, 255, 255, 0.08);
-  --border-strong: rgba(255, 255, 255, 0.12);
+  --border-weak:   rgba(255, 255, 255, 0.06);
+  --border-medium: rgba(255, 255, 255, 0.10);
+  --border-strong: rgba(255, 255, 255, 0.16);
 
   /* Bubbles */
-  --bot: #121a2c;
-  --user: linear-gradient(135deg, var(--accent) 0%, var(--accent-press) 100%);
+  --bot:  #121A2C; /* Assistant-Surface */
+  --user: linear-gradient(135deg, var(--accent-600) 0%, var(--accent-800) 100%);
+  --user-solid: var(--accent-600);
+
+  /* Code & Markdown */
+  --code-bg: #0E1726;
+  --code-border: rgba(255,255,255,.08);
+  --blockquote-bg: rgba(255,255,255,.04);
+  --table-border: rgba(255,255,255,.10);
+  --link: #93C5FD;
+
+  /* Glass/Overlays */
+  --glass: rgba(12, 18, 32, .6);
+  --glass-strong: rgba(12, 18, 32, .82);
 
   /* Typografie */
-  --font-family: -apple-system, BlinkMacSystemFont, 'Inter', 'Segoe UI', 'Roboto', 'Helvetica Neue', 'Arial', system-ui, sans-serif;
-  --font-size-xs: 12px;
-  --font-size-sm: 14px;
-  --font-size-base: 16px;
-  --font-size-lg: 20px;
-  --font-size-xl: 24px;
-  --font-size-2xl: 32px;
+  --font-family: Inter, ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, "Apple Color Emoji", "Segoe UI Emoji";
+  --font-mono: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
 
-  --line-height-tight: 1.45;
-  --line-height-base: 1.55;
-  --line-height-relaxed: 1.6;
+  /* Fontgrößen */
+  --fs-12: 12px;
+  --fs-13: 13px;
+  --fs-14: 14px;
+  --fs-16: 16px;
+  --fs-18: 18px;
+  --fs-20: 20px;
+  --fs-24: 24px;
+  --fs-28: 28px;
+  --fs-32: 32px;
 
-  --font-weight-normal: 400;
-  --font-weight-medium: 500;
-  --font-weight-semibold: 600;
-  --font-weight-bold: 700;
+  /* Zeilenhöhen */
+  --lh-tight: 1.4;
+  --lh-base:  1.55;
+  --lh-loose: 1.7;
+
+  /* Gewicht */
+  --fw-regular: 400;
+  --fw-medium:  500;
+  --fw-semibold:600;
+  --fw-bold:    700;
 
   /* Spacing (4pt Grid) */
-  --space-1: 4px;
-  --space-2: 8px;
-  --space-3: 12px;
-  --space-4: 16px;
-  --space-5: 20px;
-  --space-6: 24px;
-  --space-8: 32px;
-  --space-10: 40px;
-  --space-12: 48px;
-  --space-16: 64px;
+  --sp-1: 4px; --sp-1_5: 6px;
+  --sp-2: 8px; --sp-3: 12px;
+  --sp-4: 16px; --sp-5: 20px;
+  --sp-6: 24px; --sp-8: 32px;
+  --sp-10: 40px; --sp-12: 48px;
+  --sp-16: 64px;
 
-  /* Radius, Schatten, Motion, Z */
-  --radius: 14px;
-  --radius-btn: 12px;
-  --radius-input: 10px;
-  --radius-sm: 8px;
+  /* Radius / Shape */
+  --radius-xs: 8px;
+  --radius-sm: 10px;
+  --radius:    14px;
   --radius-lg: 18px;
   --radius-xl: 24px;
+  --radius-2xl: 28px;
   --radius-full: 999px;
 
-  --shadow-1: 0 1px 2px rgba(0, 0, 0, 0.2), 0 2px 6px rgba(0, 0, 0, 0.15);
-  --shadow-2: 0 6px 20px rgba(0, 0, 0, 0.30);
-  --shadow-3: 0 12px 40px rgba(0, 0, 0, 0.40);
-  --shadow-glow: 0 0 24px rgba(124, 58, 237, 0.3);
+  /* Schatten */
+  --shadow-1: 0 1px 2px rgba(0, 0, 0, .25), 0 2px 6px rgba(0, 0, 0, .20);
+  --shadow-2: 0 6px 20px rgba(0, 0, 0, .35);
+  --shadow-3: 0 12px 40px rgba(0, 0, 0, .45);
+  --shadow-glow: 0 0 28px rgba(124, 58, 237, .35);
 
-  --duration-fast: 120ms;
-  --duration-normal: 180ms;
-  --duration-slow: 280ms;
-  --duration-slower: 380ms;
-  --easing: cubic-bezier(0.2, 0.8, 0.2, 1);
-  --easing-bounce: cubic-bezier(0.68, -0.55, 0.265, 1.55);
+  /* Motion */
+  --dur-fast: 110ms;
+  --dur: 180ms;
+  --dur-slow: 260ms;
+  --ease: cubic-bezier(.2,.8,.2,1);
+  --ease-out: cubic-bezier(.16,1,.3,1);
 
+  /* Z-Index */
   --z-base: 1;
-  --z-dropdown: 100;
-  --z-sticky: 200;
-  --z-overlay: 300;
+  --z-sticky: 100;
+  --z-over:  300;
   --z-modal: 400;
   --z-toast: 500;
 }
@@ -85,40 +123,31 @@
 /* Light Mode */
 @media (prefers-color-scheme: light) {
   :root {
-    --bg: #FAFAFA;
+    --bg: #F7F7FB;
+    --bg-elev: #FFFFFF;
     --surface: #FFFFFF;
+    --surface-2: #F7F9FC;
+    --surface-3: #FFFFFF;
     --text: #0B0F1A;
-    --muted: #64748B;
+    --muted: #576071;
+    --muted-2: #6B7280;
+
     --separator: #E7EAF0;
-
-    --border-weak: rgba(0, 0, 0, 0.06);
-    --border-medium: rgba(0, 0, 0, 0.08);
-    --border-strong: rgba(0, 0, 0, 0.12);
-
-    --shadow-1: 0 1px 2px rgba(0, 0, 0, 0.08), 0 2px 4px rgba(0, 0, 0, 0.06);
-    --shadow-2: 0 6px 20px rgba(0, 0, 0, 0.10);
-    --shadow-3: 0 12px 40px rgba(0, 0, 0, 0.15);
-    --shadow-glow: 0 0 24px rgba(124, 58, 237, 0.2);
+    --border-weak:   rgba(0, 0, 0, 0.06);
+    --border-medium: rgba(0, 0, 0, 0.10);
+    --border-strong: rgba(0, 0, 0, 0.16);
 
     --bot: #F6F7FA;
+    --code-bg: #F4F6FB;
+    --code-border: rgba(0,0,0,.08);
+    --blockquote-bg: rgba(0,0,0,.04);
+    --table-border: rgba(0,0,0,.10);
+    --glass: rgba(255,255,255,.6);
+    --glass-strong: rgba(255,255,255,.86);
   }
 }
 
-/* Reduced motion */
+/* Reduced Motion */
 @media (prefers-reduced-motion: reduce) {
-  :root {
-    --duration-fast: 0ms;
-    --duration-normal: 0ms;
-    --duration-slow: 0ms;
-    --duration-slower: 0ms;
-  }
-}
-
-/* High contrast tweak */
-@media (prefers-contrast: high) {
-  :root {
-    --border-weak: rgba(255, 255, 255, 0.15);
-    --border-medium: rgba(255, 255, 255, 0.20);
-    --border-strong: rgba(255, 255, 255, 0.30);
-  }
+  :root { --dur-fast:0ms; --dur:0ms; --dur-slow:0ms; }
 }

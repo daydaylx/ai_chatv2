@@ -1,78 +1,63 @@
 import { useEffect, useMemo, useState } from "react";
-import { motion } from "framer-motion";
 import type { OpenRouterModel } from "../../lib/openrouter";
 import { OpenRouterClient } from "../../lib/openrouter";
 import { getPresetById, isModelAllowedByPreset } from "../../lib/presets";
 import clsx from "clsx";
-
-/**
- * WICHTIG:
- * Diese Komponente liest – wenn möglich – Modelle aus src/data/personas.json.
- * Unterstützte Schemata:
- *  A) Top-Level-Objekt:
- *     {
- *       "models": [ { "id": "...", "name"/"label": "...", "context_length"/"context": 8192, "input_price": 0.0, "output_price": 0.0 } ],
- *       "personas": [ ... ]
- *     }
- *  B) Top-Level-Array (dein bisheriger Stil), plus ein Eintrag mit { "models": [...] }:
- *     [
- *       { "id": "neutral", ... },
- *       ...,
- *       { "id": "$models", "models": [ { "id": "...", ... } ] }
- *     ]
- */
-
+// Statische Konfiguration – optional enthält sie "models"
 import raw from "../../data/personas.json";
 
 type Props = {
+  /** Aktuell gewählte Modell-ID */
   value: string;
+  /** Änderungshandler */
   onChange: (id: string) => void;
+  /** OpenRouter-Client für Fallback auf API */
   client: OpenRouterClient;
+  /** Aktive Persona-ID zum Filtern (allow/deny) */
   personaId?: string;
 };
 
-function coerceNumber(n: any): number | undefined {
+function asNumber(n: any): number | undefined {
   const v = Number(n);
   return Number.isFinite(v) && v > 0 ? v : undefined;
 }
 
+/** Extrahiert statische Modelle aus verschiedenen möglichen Schemas in personas.json */
 function extractStaticModels(anyRaw: any): OpenRouterModel[] {
   try {
     // Schema A: Objekt mit "models"
     if (anyRaw && typeof anyRaw === "object" && !Array.isArray(anyRaw) && Array.isArray((anyRaw as any).models)) {
-      const arr = (anyRaw as any).models as any[];
-      return arr
+      return ((anyRaw as any).models as any[])
         .map((m) => {
           const id = String(m?.id ?? "").trim();
           if (!id) return null;
-          const name = (m?.label ?? m?.name ?? id ?? "").toString().trim();
-          const context = coerceNumber(m?.context_length ?? m?.context);
+          const name = (m?.label ?? m?.name ?? id).toString();
+          const context_length = asNumber(m?.context_length ?? m?.context);
           const input_price = typeof m?.input_price === "number" ? m.input_price : undefined;
           const output_price = typeof m?.output_price === "number" ? m.output_price : undefined;
-          return { id, name, context_length: context, input_price, output_price, pricing: (m as any)?.pricing };
+          return { id, name, context_length, input_price, output_price, pricing: (m as any)?.pricing };
         })
         .filter(Boolean) as OpenRouterModel[];
     }
-    // Schema B: Array mit einem Eintrag, der "models" enthält
+    // Schema B: Top-Level Array; finde Eintrag mit "models"
     if (Array.isArray(anyRaw)) {
       const node = anyRaw.find((x) => x && typeof x === "object" && Array.isArray((x as any).models));
       if (node) {
-        const arr = (node as any).models as any[];
-        return arr
+        return ((node as any).models as any[])
           .map((m) => {
             const id = String(m?.id ?? "").trim();
             if (!id) return null;
-            const name = (m?.label ?? m?.name ?? id ?? "").toString().trim();
-            const context = coerceNumber(m?.context_length ?? m?.context);
+            const name = (m?.label ?? m?.name ?? id).toString();
+            const context_length = asNumber(m?.context_length ?? m?.context);
             const input_price = typeof m?.input_price === "number" ? m.input_price : undefined;
             const output_price = typeof m?.output_price === "number" ? m.output_price : undefined;
-            return { id, name, context_length: context, input_price, output_price, pricing: (m as any)?.pricing };
+            return { id, name, context_length, input_price, output_price, pricing: (m as any)?.pricing };
           })
           .filter(Boolean) as OpenRouterModel[];
       }
     }
   } catch {
-    // ignore parse/shape errors – wir fallen dann auf API zurück
+    // Bei Parserfehlern: ignore -> Fallback auf API
   }
   return [];
 }
@@ -85,35 +70,34 @@ export function ModelPicker({ value, onChange, client, personaId }: Props) {
 
   useEffect(() => {
     let mounted = true;
-    // 1) Versuch: statische Modelle aus personas.json
-    const staticModels = extractStaticModels(raw as any);
-    if (staticModels.length > 0) {
-      if (mounted) {
-        setModels(staticModels);
-        setSource("static");
-      }
+
+    // 1) Statisch aus personas.json?
+    const statics = extractStaticModels(raw as any);
+    if (statics.length > 0) {
+      setModels(statics);
+      setSource("static");
       return () => { mounted = false; };
     }
-    // 2) Fallback: OpenRouter-API
+
+    // 2) Fallback: API
     (async () => {
       try {
         const list = await client.listModels();
-        if (mounted) {
-          setModels(list);
-          setSource("api");
-        }
+        if (!mounted) return;
+        setModels(list);
+        setSource("api");
       } catch (e) {
-        console.error("[ModelPicker] Modelle nicht ladbar:", e);
-        if (mounted) {
-          setModels([]);
-          setSource("none");
-        }
+        console.error("[ModelPicker] Modelle konnten nicht geladen werden:", e);
+        if (!mounted) return;
+        setModels([]);
+        setSource("none");
       }
     })();
+
     return () => { mounted = false; };
   }, [client]);
 
-  /** Modelle mit Kompatibilitätskennzeichnung (allow/deny vom Preset) */
+  // Mit Kompatibilitätsstatus (allow/deny durch persona)
   const withCompat = useMemo(
     () =>
       (models ?? []).map((m) => {
@@ -124,18 +108,18 @@ export function ModelPicker({ value, onChange, client, personaId }: Props) {
     [models, preset]
   );
 
-  /** Ist das aktuell gewählte Modell kompatibel zum aktiven Stil? */
+  // Ist aktuell gewähltes Modell kompatibel?
   const currentAllowed = useMemo(() => {
     const id = value ?? "";
     return id ? isModelAllowedByPreset(preset, id) : true;
   }, [preset, value]);
 
   return (
-    <div className="space-y-3">
+    <div className="space-y-2">
       <select
         className={clsx(
           "w-full px-4 py-3 rounded-lg text-sm transition-all appearance-none cursor-pointer",
-          "bg-secondary/50 border border-border/50 focus:outline-none focus:ring-2 focus:ring-primary/50 focus:border-primary/50"
+          "bg-secondary/50 border border-border/50 focus:outline-none focus:ring-2 focus:ring-primary/40 focus:border-primary/40"
         )}
         value={value}
         onChange={(e) => onChange(e.target.value)}
@@ -143,16 +127,11 @@ export function ModelPicker({ value, onChange, client, personaId }: Props) {
       >
         <option value="">— Modell wählen —</option>
         {withCompat.map(({ model: m, id, allowed }, idx) => {
-          const base = (m.name ?? id) || "Unbenanntes Modell";
+          const base = (m.name ?? id) || "Modell";
           const ctx = m.context_length ? ` · ${m.context_length}` : "";
-          const label = base + ctx + (!allowed ? " (inkompatibel)" : "");
           return (
-            <option
-              key={id || m.name || `m-${idx}`}
-              value={id}
-              disabled={!allowed || !id}
-            >
-              {label}
+            <option key={id || m.name || `m-${idx}`} value={id} disabled={!allowed || !id}>
+              {base + ctx + (!allowed ? " (inkompatibel)" : "")}
             </option>
           );
         })}
@@ -163,13 +142,9 @@ export function ModelPicker({ value, onChange, client, personaId }: Props) {
       </div>
 
       {!currentAllowed && (
-        <motion.div
-          initial={{ opacity: 0 }}
-          animate={{ opacity: 1 }}
-          className="text-sm text-warn bg-warn/10 p-3 rounded-lg border border-warn/20"
-        >
-          Das aktuelle Modell ist mit dem gewählten Stil nicht kompatibel.
-        </motion.div>
+        <div className="text-sm text-yellow-300/90 bg-yellow-300/10 p-3 rounded-lg border border-yellow-300/20">
+          Das aktuell gewählte Modell ist mit dem Stil nicht kompatibel.
+        </div>
       )}
     </div>
   );

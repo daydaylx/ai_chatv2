@@ -5,6 +5,7 @@ import SettingsDrawer from "./features/settings/SettingsDrawer";
 import ChatPanel from "./features/chat/ChatPanel";
 import PersonaPicker from "./features/settings/PersonaPicker";
 import ChatSheet from "./features/chats/ChatSheet";
+import MemoryPanel from "./features/memory/MemoryPanel";
 import { OpenRouterClient } from "./lib/openrouter";
 import { PRESETS } from "./lib/presets";
 import { useChatStore } from "./entities/chat/store";
@@ -18,6 +19,7 @@ export default function App() {
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [personaOpen, setPersonaOpen] = useState(false);
   const [chatsOpen, setChatsOpen] = useState(false);
+  const [memOpen, setMemOpen] = useState(false);
 
   const [modelId, setModelId] = useState<string>(() => localStorage.getItem(LS_MODEL) || "");
   const [personaId, setPersonaId] = useState<string>(() => localStorage.getItem(LS_PERSONA) || "neutral");
@@ -35,8 +37,14 @@ export default function App() {
     if (!currentChat && chats[0]) setCurrentChat(chats[0].id);
   }, [currentChat, chats, setCurrentChat]);
 
-  useEffect(() => { localStorage.setItem(LS_MODEL, modelId || ""); }, [modelId]);
-  useEffect(() => { localStorage.setItem(LS_PERSONA, personaId || ""); }, [personaId]);
+  useEffect(() => {
+    localStorage.setItem(LS_MODEL, modelId || "");
+  }, [modelId]);
+
+  useEffect(() => {
+    localStorage.setItem(LS_PERSONA, personaId || "");
+  }, [personaId]);
+
   useEffect(() => {
     localStorage.setItem(LS_THEME, theme);
     document.documentElement.className = theme;
@@ -57,6 +65,7 @@ export default function App() {
         theme={theme}
         onToggleTheme={toggleTheme}
         onOpenChats={() => setChatsOpen(true)}
+        onOpenMemory={() => setMemOpen(true)}
       />
 
       <main className="relative flex-1 min-h-0 overflow-hidden">
@@ -100,9 +109,8 @@ export default function App() {
         )}
       </AnimatePresence>
 
-      <AnimatePresence>
-        {chatsOpen && <ChatSheet open={chatsOpen} onClose={() => setChatsOpen(false)} />}
-      </AnimatePresence>
+      <AnimatePresence>{chatsOpen && <ChatSheet open={chatsOpen} onClose={() => setChatsOpen(false)} />}</AnimatePresence>
+      <AnimatePresence>{memOpen && <MemoryPanel open={memOpen} onClose={() => setMemOpen(false)} />}</AnimatePresence>
     </div>
   );
 }

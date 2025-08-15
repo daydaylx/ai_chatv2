@@ -10,6 +10,7 @@ type Props = {
   theme: "dark" | "light";
   onToggleTheme: () => void;
   onOpenChats?: () => void;
+  onOpenMemory?: () => void;
 };
 
 export default function Header({
@@ -20,8 +21,11 @@ export default function Header({
   theme,
   onToggleTheme,
   onOpenChats,
+  onOpenMemory,
 }: Props) {
   const current = useChatStore((s) => s.currentChat());
+  const streaming = useChatStore((s) => s.settings.streaming);
+  const toggleStreaming = useChatStore((s) => s.toggleStreaming);
 
   return (
     <motion.header
@@ -40,13 +44,52 @@ export default function Header({
         </motion.button>
 
         {current?.title && (
-          <span className="line-clamp-1 max-w-[45vw] rounded-full border border-primary/20 bg-primary/10 px-3 py-1 text-xs font-medium text-primary md:max-w-md">
+          <span className="line-clamp-1 max-w-[42vw] rounded-full border border-primary/20 bg-primary/10 px-3 py-1 text-xs font-medium text-primary md:max-w-md">
             {current.title}
+          </span>
+        )}
+
+        {modelLabel ? (
+          <span className="hidden md:inline-flex rounded-full border border-primary/20 bg-primary/10 px-3 py-1 text-xs font-medium text-primary">
+            {modelLabel}
+          </span>
+        ) : (
+          <span className="hidden md:inline-flex rounded-full border border-destructive/20 bg-destructive/10 px-3 py-1 text-xs font-medium text-destructive">
+            Kein Modell
           </span>
         )}
       </div>
 
       <div className="flex items-center gap-2">
+        {/* Streaming-Toggle */}
+        <motion.button
+          whileHover={{ scale: 1.05 }}
+          whileTap={{ scale: 0.95 }}
+          onClick={toggleStreaming}
+          className={clsx(
+            "flex h-10 w-10 items-center justify-center rounded-xl border text-xs font-medium",
+            streaming
+              ? "border-primary/50 bg-primary/10 text-primary"
+              : "border-border/60 bg-secondary/60 text-muted-foreground"
+          )}
+          title="Streaming ein/aus"
+          aria-label="Streaming"
+        >
+          ⚡
+        </motion.button>
+
+        {/* Memory-Panel */}
+        <motion.button
+          whileHover={{ scale: 1.05 }}
+          whileTap={{ scale: 0.95 }}
+          onClick={onOpenMemory}
+          className="flex h-10 w-10 items-center justify-center rounded-xl border border-border/60 bg-secondary/60 text-muted-foreground transition-colors hover:text-foreground"
+          aria-label="Memories"
+          title="Memories / Kontext"
+        >
+          🧠
+        </motion.button>
+
         <motion.button
           whileHover={{ scale: 1.05 }}
           whileTap={{ scale: 0.95 }}

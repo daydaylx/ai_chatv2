@@ -1,45 +1,83 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState, type RefObject } from "react";
 
-export function usePullToRefresh(containerRef: React.RefObject<HTMLElement>, onRefresh: () => Promise<void> | void) {
+type Options = {
+  distance?: number;
+  maxPull?: number;
+};
+
+/**
+ * Benutzung:
+ * const { offset, active } = usePullToRefresh(listRef, async () => {...}, { distance: 80, maxPull: 120 })
+ */
+export function usePullToRefresh(
+  elRef: RefObject<HTMLElement>,
+  onRefresh: () => void | Promise<void>,
+  { distance = 80, maxPull = 120 }: Options = {}
+) {
   const startY = useRef<number | null>(null);
-  const pulling = useRef(false);
+  const [active, setActive] = useState(false);
   const [offset, setOffset] = useState(0);
-  const THRESH = 70;
 
   useEffect(() => {
-    const el = containerRef.current;
+    const el = elRef.current;
     if (!el) return;
 
-    function onTouchStart(e: TouchEvent) {
-      if (el.scrollTop !== 0) return;
-      startY.current = e.touches[0].clientY;
-      pulling.current = true;
+    function onStart(e: TouchEvent) {
+      const node = elRef.current;
+      if (!node) return;
+      if (node.scrollTop !== 0) return;
+
+      const t0 = e.touches.item(0);
+      if (!t0) return;
+
+      startY.current = t0.clientY;
+      setActive(true);
       setOffset(0);
     }
-    function onTouchMove(e: TouchEvent) {
-      if (!pulling.current || startY.current == null) return;
-      const dy = e.touches[0].clientY - startY.current;
-      if (dy > 0) {
-        e.preventDefault();
-        setOffset(Math.min(dy, 120));
-      } else {
+
+    function onMove(e: TouchEvent) {
+      if (!active || startY.current == null) return;
+
+      const t0 = e.touches.item(0);
+      if (!t0) return;
+
+      const dy = t0.clientY - startY.current;
+      if (dy <= 0) {
+        // Reset wenn nach oben gewischt
+        setActive(false);
+        startY.current = null;
         setOffset(0);
+        return;
+      }
+      setOffset(Math.min(dy, maxPull));
+    }
+
+    async function onEnd() {
+      if (!active) return;
+      const shouldRefresh = offset >= distance;
+
+      // Reset
+      setActive(false);
+      startY.current = null;
+      setOffset(0);
+
+      if (shouldRefresh) {
+        await onRefresh();
       }
     }
-    async function onTouchEnd() {
-      if (offset > THRESH) await onRefresh();
-      pulling.current = false; startY.current = null; setOffset(0);
-    }
 
-    el.addEventListener("touchstart", onTouchStart, { passive: true });
-    el.addEventListener("touchmove", onTouchMove, { passive: false });
-    el.addEventListener("touchend", onTouchEnd, { passive: true });
+    el.addEventListener("touchstart", onStart, { passive: true });
+    el.addEventListener("touchmove", onMove, { passive: true });
+    el.addEventListener("touchend", onEnd);
+    el.addEventListener("touchcancel", onEnd);
+
     return () => {
-      el.removeEventListener("touchstart", onTouchStart);
-      el.removeEventListener("touchmove", onTouchMove);
-      el.removeEventListener("touchend", onTouchEnd);
+      el.removeEventListener("touchstart", onStart);
+      el.removeEventListener("touchmove", onMove);
+      el.removeEventListener("touchend", onEnd);
+      el.removeEventListener("touchcancel", onEnd);
     };
-  }, [containerRef, offset, onRefresh]);
+  }, [elRef, onRefresh, active, offset, distance, maxPull]);
 
-  return { offset, active: offset > 0 };
+  return { offset, active };
 }

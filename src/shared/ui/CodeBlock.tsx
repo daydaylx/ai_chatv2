@@ -1,36 +1,71 @@
-import { useState } from "react";
+import clsx from "clsx";
+import { useCallback } from "react";
 
-export default function CodeBlock({ code, lang }: { code: string; lang?: string }) {
-  const [copied, setCopied] = useState(false);
+export type Segment =
+  | { type: "text"; value: string }
+  | { type: "code"; value: string; lang?: string };
 
-  async function copy() {
-    try {
-      await navigator.clipboard.writeText(code);
-      setCopied(true);
-      setTimeout(() => setCopied(false), 1200);
-      if ("vibrate" in navigator) (navigator as any).vibrate?.(15);
-    } catch {}
+/** Zerlegt Text in Text-/Code-Segmente anhand ```lang ... ``` Blöcken */
+export function parseMessageToSegments(input: string): Segment[] {
+  const segs: Segment[] = [];
+  const re = /```(\w+)?\n([\s\S]*?)```/g;
+  let lastIndex = 0;
+  let m: RegExpExecArray | null;
+
+  while ((m = re.exec(input))) {
+    const [full, langGroup, codeGroup] = m;
+    const before = input.slice(lastIndex, m.index);
+    if (before) segs.push({ type: "text", value: before });
+
+    const lang = (langGroup || "").trim() || undefined;
+    const code = (codeGroup ?? "").replace(/\n+$/, "");
+    segs.push({ type: "code", value: code, lang });
+
+    lastIndex = m.index + full.length;
   }
 
-  return (
-    <pre className="code">
-      <button className="code-copy" onClick={copy}>{copied ? "Kopiert" : "Copy"}</button>
-      <code className="block whitespace-pre">{code}</code>
-    </pre>
-  );
+  const rest = input.slice(lastIndex);
+  if (rest) segs.push({ type: "text", value: rest });
+  return segs;
 }
 
-/** Dumb parser: splittet ```lang ... ``` in Segmente */
-export function parseMessageToSegments(text: string): Array<{ type: "text" | "code"; value: string; lang?: string }> {
-  const rx = /```(\w+)?\n([\s\S]*?)```/g;
-  const segs: Array<{ type: "text" | "code"; value: string; lang?: string }> = [];
-  let last = 0;
-  let m: RegExpExecArray | null;
-  while ((m = rx.exec(text))) {
-    if (m.index > last) segs.push({ type: "text", value: text.slice(last, m.index) });
-    segs.push({ type: "code", value: m[2], lang: m[1] || undefined });
-    last = rx.lastIndex;
-  }
-  if (last < text.length) segs.push({ type: "text", value: text.slice(last) });
-  return segs.length ? segs : [{ type: "text", value: text }];
+type Props = {
+  code: string;
+  lang?: string;
+  className?: string;
+};
+
+/** Einzelner Codeblock mit Copy-Button (mobile-freundlich) */
+export default function CodeBlock({ code, lang, className }: Props) {
+  const copy = useCallback(async () => {
+    try {
+      await navigator.clipboard.writeText(code);
+    } catch {
+      // still ok; no throw
+    }
+  }, [code]);
+
+  return (
+    <div
+      className={clsx(
+        "group relative rounded-xl border border-border/60 bg-secondary/50 p-3 backdrop-blur",
+        className
+      )}
+    >
+      <div className="mb-2 flex items-center justify-between">
+        <span className="text-xs uppercase tracking-wide text-muted-foreground">
+          {lang ?? "code"}
+        </span>
+        <button
+          onClick={copy}
+          className="rounded-lg border border-border/60 px-2 py-1 text-xs text-muted-foreground transition-colors hover:bg-secondary/60"
+        >
+          Kopieren
+        </button>
+      </div>
+      <pre className="overflow-x-auto rounded-lg bg-background/60 p-3 text-xs leading-relaxed">
+        <code>{code}</code>
+      </pre>
+    </div>
+  );
 }

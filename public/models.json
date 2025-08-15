@@ -1,6 +1,7 @@
 [
-  { "id": "openrouter/llama-3.1-8b-instruct:free", "label": "Llama 3.1 8B (free)", "provider": "OpenRouter", "context": 8192 },
-  { "id": "openrouter/mistral-nemo:free", "label": "Mistral Nemo (free)", "provider": "OpenRouter", "context": 8192 },
-  { "id": "openrouter/nous-hermes-2-mixtral-8x7b-dpo:free", "label": "Nous Hermes 2 (Mixtral)", "provider": "OpenRouter", "context": 8192 },
-  { "id": "openrouter/gemma-7b-it:free", "label": "Gemma 7B IT (free)", "provider": "OpenRouter", "context": 8192 }
+  { "id": "openai/gpt-4o-mini", "name": "GPT-4o mini", "vendor": "openai", "context_length": 128000 },
+  { "id": "openai/gpt-4o", "name": "GPT-4o", "vendor": "openai", "context_length": 128000 },
+  { "id": "anthropic/claude-3.5-sonnet", "name": "Claude 3.5 Sonnet", "vendor": "anthropic", "context_length": 200000 },
+  { "id": "meta-llama/llama-3.1-8b-instruct", "name": "Llama 3.1 8B Instruct", "vendor": "meta", "context_length": 128000 },
+  { "id": "google/gemini-1.5-pro", "name": "Gemini 1.5 Pro", "vendor": "google", "context_length": 1000000 }
 ]

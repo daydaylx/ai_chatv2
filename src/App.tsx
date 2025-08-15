@@ -5,10 +5,9 @@ import SettingsDrawer from "./features/settings/SettingsDrawer";
 import ChatPanel from "./features/chat/ChatPanel";
 import PersonaPicker from "./features/settings/PersonaPicker";
 import ChatSheet from "./features/chats/ChatSheet";
-import MemoryPanel from "./features/memory/MemoryPanel";
 import { OpenRouterClient } from "./lib/openrouter";
-import { PRESETS } from "./lib/presets";
 import { useChatStore } from "./entities/chat/store";
+import { useConfigStore } from "./entities/config/store";
 
 const LS_MODEL = "model_id";
 const LS_PERSONA = "persona_id";
@@ -19,7 +18,6 @@ export default function App() {
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [personaOpen, setPersonaOpen] = useState(false);
   const [chatsOpen, setChatsOpen] = useState(false);
-  const [memOpen, setMemOpen] = useState(false);
 
   const [modelId, setModelId] = useState<string>(() => localStorage.getItem(LS_MODEL) || "");
   const [personaId, setPersonaId] = useState<string>(() => localStorage.getItem(LS_PERSONA) || "neutral");
@@ -31,6 +29,10 @@ export default function App() {
   const currentChat = useChatStore((s) => s.currentChat());
   const setCurrentChat = useChatStore((s) => s.setCurrentChat);
   const chats = useChatStore((s) => s.chats);
+
+  // Config laden (Personas/Modelle)
+  const { load, loaded, getPersonaById } = useConfigStore();
+  useEffect(() => { if (!loaded) void load(); }, [loaded, load]);
 
   // ensure a current chat exists
   useEffect(() => {
@@ -50,8 +52,8 @@ export default function App() {
     document.documentElement.className = theme;
   }, [theme]);
 
-  const currentPreset = PRESETS.find((p) => p.id === personaId);
-  const personaLabel = currentPreset ? currentPreset.label : undefined;
+  const persona = getPersonaById(personaId);
+  const personaLabel = persona?.label;
 
   const toggleTheme = () => setTheme((prev) => (prev === "dark" ? "light" : "dark"));
 
@@ -65,7 +67,6 @@ export default function App() {
         theme={theme}
         onToggleTheme={toggleTheme}
         onOpenChats={() => setChatsOpen(true)}
-        onOpenMemory={() => setMemOpen(true)}
       />
 
       <main className="relative flex-1 min-h-0 overflow-hidden">
@@ -109,8 +110,9 @@ export default function App() {
         )}
       </AnimatePresence>
 
-      <AnimatePresence>{chatsOpen && <ChatSheet open={chatsOpen} onClose={() => setChatsOpen(false)} />}</AnimatePresence>
-      <AnimatePresence>{memOpen && <MemoryPanel open={memOpen} onClose={() => setMemOpen(false)} />}</AnimatePresence>
+      <AnimatePresence>
+        {chatsOpen && <ChatSheet open={chatsOpen} onClose={() => setChatsOpen(false)} />}
+      </AnimatePresence>
     </div>
   );
 }

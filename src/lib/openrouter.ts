@@ -1,9 +1,9 @@
 export type ChatMessage = { role: "system" | "user" | "assistant"; content: string };
 
 export type OpenRouterModel = {
-  id: string;            // z.B. "openai/gpt-4o-mini"
-  name?: string;         // Displayname
-  vendor?: string;       // z.B. "openai", "anthropic"
+  id: string;
+  name?: string;
+  vendor?: string;
   context_length?: number;
 };
 
@@ -22,27 +22,21 @@ export class OpenRouterClient {
   constructor() {
     this.key = (typeof localStorage !== "undefined" && localStorage.getItem("openrouter_api_key")) || null;
   }
-
-  /** NIE null zurückgeben -> vereinfacht die Aufrufer */
   getApiKey(): string {
     return this.key ?? "";
   }
-
   setApiKey(k: string) {
     this.key = k;
     if (typeof localStorage !== "undefined") localStorage.setItem("openrouter_api_key", k);
   }
-
   clearApiKey() {
     this.key = null;
     if (typeof localStorage !== "undefined") localStorage.removeItem("openrouter_api_key");
   }
 
-  /** Versucht Live-Fetch; bei Fehlern gibt es eine sinnvolle Fallback-Liste */
   async listModels(): Promise<OpenRouterModel[]> {
     const headers: Record<string, string> = { "Content-Type": "application/json" };
     if (this.key) headers["Authorization"] = "Bearer " + this.key;
-
     try {
       const resp = await fetch("https://openrouter.ai/api/v1/models", { headers });
       if (!resp.ok) throw new Error(String(resp.status));
@@ -55,20 +49,18 @@ export class OpenRouterClient {
         context_length: Number(m?.context_length ?? 0) || undefined,
       })).filter((m: OpenRouterModel) => !!m.id);
     } catch {
-      // Fallback – deckt die gängigen Kandidaten ab
       return [
         { id: "openai/gpt-4o-mini", name: "GPT-4o mini", vendor: "openai", context_length: 128000 },
         { id: "openai/gpt-4o", name: "GPT-4o", vendor: "openai", context_length: 128000 },
         { id: "anthropic/claude-3.5-sonnet", name: "Claude 3.5 Sonnet", vendor: "anthropic", context_length: 200000 },
-        { id: "meta-llama/llama-3.1-8b-instruct", name: "Llama 3.1 8B Inst", vendor: "meta", context_length: 128000 },
-        { id: "google/gemini-1.5-pro", name: "Gemini 1.5 Pro", vendor: "google", context_length: 1000000 },
+        { id: "meta-llama/llama-3.1-8b-instruct", name: "Llama 3.1 8B Instruct", vendor: "meta", context_length: 128000 },
+        { id: "google/gemini-1.5-pro", name: "Gemini 1.5 Pro", vendor: "google", context_length: 1000000 }
       ];
     }
   }
 
   async chat(params: ChatParams): Promise<{ content: string }> {
     const { model, messages, temperature = 0.7, max_tokens = 1024, stream, onDelta, signal } = params;
-
     const body = { model, messages, temperature, max_tokens, stream: !!stream };
     const headers: Record<string, string> = { "Content-Type": "application/json" };
     if (this.key) headers["Authorization"] = "Bearer " + this.key;
@@ -79,7 +71,6 @@ export class OpenRouterClient {
       body: JSON.stringify(body),
       signal,
     });
-
     if (!resp.ok) {
       const t = await resp.text().catch(() => "");
       throw new Error("OpenRouter error: " + resp.status + " " + t);
@@ -90,12 +81,10 @@ export class OpenRouterClient {
       if (!reader) throw new Error("Streaming not supported in this environment");
       const decoder = new TextDecoder("utf-8");
       let full = "";
-
       while (true) {
         const { done, value } = await reader.read();
         if (done) break;
         const chunk = decoder.decode(value, { stream: true });
-
         for (const line of chunk.split("\n")) {
           const trimmed = line.trim();
           if (!trimmed.startsWith("data:")) continue;
@@ -104,13 +93,8 @@ export class OpenRouterClient {
           try {
             const json = JSON.parse(jsonStr);
             const delta = json?.choices?.[0]?.delta?.content ?? "";
-            if (delta) {
-              full += delta;
-              onDelta?.(delta);
-            }
-          } catch {
-            /* noop */
-          }
+            if (delta) { full += delta; onDelta?.(delta); }
+          } catch {}
         }
       }
       return { content: full };

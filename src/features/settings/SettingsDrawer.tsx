@@ -1,7 +1,8 @@
-import { useEffect, useMemo, useState } from "react";
+import { useMemo, useState, useEffect } from "react";
 import { motion } from "framer-motion";
 import type { OpenRouterModel } from "../../lib/openrouter";
 import { OpenRouterClient } from "../../lib/openrouter";
+import { useConfigStore } from "../../entities/config/store";
 
 type Props = {
   open: boolean;
@@ -26,22 +27,14 @@ export default function SettingsDrawer({
   onOpenPersona,
 }: Props) {
   const [key, setKey] = useState<string>(() => client.getApiKey());
-  const [models, setModels] = useState<OpenRouterModel[]>([]);
-  const [loading, setLoading] = useState(false);
+  const { models, load, loaded, loading, reload } = useConfigStore();
 
   useEffect(() => {
-    if (!open) return;
-    setLoading(true);
-    client
-      .listModels()
-      .then(setModels)
-      .catch(() => setModels([]))
-      .finally(() => setLoading(false));
-  }, [open, client]);
+    if (open && !loaded && !loading) void load();
+  }, [open, loaded, loading, load]);
 
-  const sorted = useMemo(
-    () =>
-      [...models].sort((a, b) => (a.vendor || "").localeCompare(b.vendor || "") || a.id.localeCompare(b.id)),
+  const sorted = useMemo<OpenRouterModel[]>(
+    () => [...models].sort((a, b) => (a.vendor || "").localeCompare(b.vendor || "") || a.id.localeCompare(b.id)),
     [models]
   );
 
@@ -126,8 +119,16 @@ export default function SettingsDrawer({
 
             {/* Modelle */}
             <section>
-              <div className="mb-2 text-sm font-medium">Modell</div>
-              {loading ? (
+              <div className="mb-2 flex items-center justify-between">
+                <span className="text-sm font-medium">Modell</span>
+                <button
+                  onClick={() => reload()}
+                  className="rounded-lg border border-border/60 bg-secondary/60 px-2 py-1 text-xs"
+                >
+                  Neu laden
+                </button>
+              </div>
+              {!loaded ? (
                 <div className="text-sm text-muted-foreground">Lade Modelle…</div>
               ) : (
                 <select

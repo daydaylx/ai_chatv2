@@ -1,7 +1,9 @@
-import { type ClassValue, clsx } from "clsx";
-import { twMerge } from "tailwind-merge";
+import { clsx, type ClassValue } from "clsx";
 
-/** Tailwind-Klassen stabil zusammenführen (Konflikte deduplizieren). */
+/**
+ * Minimale cn-Hilfsfunktion.
+ * Falls du tailwind-merge später nutzen willst, kannst du es hier ergänzen.
+ */
 export function cn(...inputs: ClassValue[]) {
-  return twMerge(clsx(...inputs));
+  return clsx(...inputs);
 }

@@ -1,4 +1,10 @@
-import { useEffect, useMemo, useRef, useState, type KeyboardEvent as ReactKeyboardEvent } from "react";
+import {
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+  type KeyboardEvent as ReactKeyboardEvent,
+} from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import type { ChatMessage as ORMessage } from "../../lib/openrouter";
 import { OpenRouterClient } from "../../lib/openrouter";
@@ -15,11 +21,18 @@ type Props = {
 };
 
 function uuid() {
-  if ((globalThis as any)?.crypto?.randomUUID) return (globalThis as any).crypto.randomUUID();
+  if ((globalThis as any)?.crypto?.randomUUID)
+    return (globalThis as any).crypto.randomUUID();
   return `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
 }
 
-export default function ChatPanel({ client, modelId, apiKeyPresent, onOpenSettings, personaId }: Props) {
+export default function ChatPanel({
+  client,
+  modelId,
+  apiKeyPresent,
+  onOpenSettings,
+  personaId,
+}: Props) {
   const currentChat = useChatStore((s) => s.currentChat());
   const chatId = currentChat?.id ?? null;
   const messages = useChatStore((s) => s.listMessages(chatId));
@@ -62,7 +75,10 @@ export default function ChatPanel({ client, modelId, apiKeyPresent, onOpenSettin
 
   async function send() {
     if (busy || !input.trim() || !chatId) return;
-    if (disabledReason) { onOpenSettings(); return; }
+    if (disabledReason) {
+      onOpenSettings();
+      return;
+    }
 
     const trimmed = input.trim();
     setInput("");
@@ -72,7 +88,10 @@ export default function ChatPanel({ client, modelId, apiKeyPresent, onOpenSettin
 
     setBusy(true);
     try {
-      const historyMsgs = messages.map(({ role, content }) => ({ role, content })) as ORMessage[];
+      const historyMsgs = messages.map(({ role, content }) => ({
+        role,
+        content,
+      })) as ORMessage[];
       const baseMsgs = systemMsg ? [systemMsg, ...historyMsgs] : historyMsgs;
 
       const res = await client.chat({
@@ -84,7 +103,10 @@ export default function ChatPanel({ client, modelId, apiKeyPresent, onOpenSettin
 
       addMessage(chatId, { role: "assistant", content: res.content });
     } catch (e: any) {
-      addMessage(chatId, { role: "assistant", content: `❌ ${e?.message ?? String(e)}` });
+      addMessage(chatId, {
+        role: "assistant",
+        content: `❌ ${e?.message ?? String(e)}`,
+      });
     } finally {
       setBusy(false);
       setTimeout(() => taRef.current?.focus(), 0);
@@ -137,7 +159,10 @@ export default function ChatPanel({ client, modelId, apiKeyPresent, onOpenSettin
                 animate={{ opacity: 1, y: 0 }}
                 exit={{ opacity: 0, y: -20 }}
                 transition={{ duration: 0.3, delay: index * 0.05 }}
-                className={clsx("flex", item.role === "user" ? "justify-end" : "justify-start")}
+                className={clsx(
+                  "flex",
+                  item.role === "user" ? "justify-end" : "justify-start"
+                )}
               >
                 <div
                   className={clsx(
@@ -147,11 +172,19 @@ export default function ChatPanel({ client, modelId, apiKeyPresent, onOpenSettin
                       : "mr-8 border border-border/50 bg-secondary/50 backdrop-blur"
                   )}
                 >
-                  <div className="whitespace-pre-wrap break-words text-sm md:text-base">{item.content}</div>
+                  <div className="whitespace-pre-wrap break-words text-sm md:text-base">
+                    {item.content}
+                  </div>
                   <div
-                    className={clsx("mt-2 text-xs opacity-60", item.role === "user" ? "text-right text-white" : "")}
+                    className={clsx(
+                      "mt-2 text-xs opacity-60",
+                      item.role === "user" ? "text-right text-white" : ""
+                    )}
                   >
-                    {new Date(item.ts).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}
+                    {new Date(item.ts).toLocaleTimeString([], {
+                      hour: "2-digit",
+                      minute: "2-digit",
+                    })}
                   </div>
                 </div>
               </motion.div>
@@ -159,7 +192,11 @@ export default function ChatPanel({ client, modelId, apiKeyPresent, onOpenSettin
           </AnimatePresence>
 
           {busy && (
-            <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} className="flex justify-start">
+            <motion.div
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              className="flex justify-start"
+            >
               <div className="mr-8 rounded-2xl border border-border/50 bg-secondary/50 px-4 py-3 backdrop-blur">
                 <div className="loading-dots flex gap-1">
                   <span className="h-2 w-2 rounded-full bg-muted-foreground" />

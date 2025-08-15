@@ -6,8 +6,8 @@ import ChatPanel from "./features/chat/ChatPanel";
 import PersonaPicker from "./features/settings/PersonaPicker";
 import ChatSheet from "./features/chats/ChatSheet";
 import { OpenRouterClient } from "./lib/openrouter";
+import { PRESETS } from "./lib/presets";
 import { useChatStore } from "./entities/chat/store";
-import { useConfigStore } from "./entities/config/store";
 
 const LS_MODEL = "model_id";
 const LS_PERSONA = "persona_id";
@@ -26,19 +26,17 @@ export default function App() {
     () => (localStorage.getItem(LS_THEME) as "dark" | "light") || "dark"
   );
 
+  // Chat-Store
   const currentChat = useChatStore((s) => s.currentChat());
   const setCurrentChat = useChatStore((s) => s.setCurrentChat);
   const chats = useChatStore((s) => s.chats);
 
-  // Config laden (Personas/Modelle)
-  const { load, loaded, getPersonaById } = useConfigStore();
-  useEffect(() => { if (!loaded) void load(); }, [loaded, load]);
-
-  // ensure a current chat exists
+  // Ensure there is a current chat selected
   useEffect(() => {
     if (!currentChat && chats[0]) setCurrentChat(chats[0].id);
   }, [currentChat, chats, setCurrentChat]);
 
+  // Persist simple settings
   useEffect(() => {
     localStorage.setItem(LS_MODEL, modelId || "");
   }, [modelId]);
@@ -52,8 +50,8 @@ export default function App() {
     document.documentElement.className = theme;
   }, [theme]);
 
-  const persona = getPersonaById(personaId);
-  const personaLabel = persona?.label;
+  const currentPreset = PRESETS.find((p) => p.id === personaId);
+  const personaLabel = currentPreset ? currentPreset.label : undefined;
 
   const toggleTheme = () => setTheme((prev) => (prev === "dark" ? "light" : "dark"));
 
@@ -69,6 +67,7 @@ export default function App() {
         onOpenChats={() => setChatsOpen(true)}
       />
 
+      {/* WICHTIG: min-h-0 + overflow-hidden, damit das Kind (ChatPanel) scrollen darf */}
       <main className="relative flex-1 min-h-0 overflow-hidden">
         <div className="pointer-events-none absolute inset-0 bg-gradient-to-t from-primary/5 via-transparent to-transparent" />
         <ChatPanel
@@ -77,6 +76,7 @@ export default function App() {
           apiKeyPresent={apiKeyPresent}
           onOpenSettings={() => setSettingsOpen(true)}
           personaId={personaId}
+          onOpenChats={() => setChatsOpen(true)}
         />
       </main>
 

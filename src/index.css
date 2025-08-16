@@ -1,83 +1,59 @@
-/* Basisfarben für Dark Mode */
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* App-Design-Tokens */
 :root {
-  --primary: #4f8cff;
-  --primary-rgb: 79, 140, 255;
-  --secondary: #1c1f26;
-  --border: rgba(255,255,255,0.1);
-  --text: #f5f5f5;
-  --muted: #a1a1a1;
-  --accent: #4f8cff;
+  --ring: 58 100% 50%;
+}
+:root[data-theme="dark"] {
+  color-scheme: dark;
 }
 
-/* Dark Mode Standard */
-html {
-  background: var(--secondary);
-  color: var(--text);
-  font-family: system-ui, sans-serif;
+html, body, #root {
+  height: 100%;
 }
 
-/* Inputs & Buttons */
-input, select, button, textarea {
-  font-family: inherit;
-  font-size: 15px;
+/* Fokus-Ring konsistent */
+*:focus-visible {
+  outline: 2px solid hsl(var(--ring));
+  outline-offset: 2px;
 }
 
-input, select, textarea {
-  background: var(--secondary);
-  border: 1px solid var(--border);
-  border-radius: 10px;
-  padding: 10px 12px;
-  color: var(--text);
-}
-
-input:focus, select:focus, textarea:focus {
-  outline: none;
-  border-color: var(--accent);
-  box-shadow: 0 0 0 2px rgba(var(--primary-rgb), 0.3);
-}
-
-button {
-  cursor: pointer;
-  border: none;
-  border-radius: 10px;
-  padding: 10px 14px;
-  font-weight: 500;
-  background: var(--primary);
-  color: white;
-}
-
-button:hover {
-  background: #3c6cd9;
-}
-
-/* Kartenlayout */
+/* Karten & Panels */
 .card {
-  background: var(--secondary);
-  border: 1px solid var(--border);
-  border-radius: 12px;
-  padding: 14px;
+  @apply bg-white dark:bg-neutral-900 rounded-2xl shadow-soft border border-neutral-200 dark:border-neutral-800;
+}
+.panel {
+  @apply bg-white dark:bg-neutral-900 rounded-xl border border-neutral-200 dark:border-neutral-800;
 }
 
-/* Mobile Optimierungen */
-@media (max-width: 768px) {
-  html, body {
-    font-size: 15px;
-    -webkit-tap-highlight-color: transparent;
-  }
-  input, select, textarea, button {
-    font-size: 16px; /* verhindert iOS-Zoom */
-  }
-  .card {
-    padding: 12px;
-  }
+/* Button-Basis */
+.btn {
+  @apply inline-flex items-center justify-center gap-2 rounded-xl px-4 py-2 text-sm font-medium transition;
+}
+.btn-primary {
+  @apply bg-blue-600 text-white hover:bg-blue-700 active:bg-blue-800 disabled:opacity-60 disabled:pointer-events-none;
+}
+.btn-secondary {
+  @apply bg-neutral-100 dark:bg-neutral-800 text-neutral-900 dark:text-neutral-100 hover:bg-neutral-200 dark:hover:bg-neutral-700;
+}
+.btn-ghost {
+  @apply bg-transparent hover:bg-neutral-100 dark:hover:bg-neutral-800;
 }
 
-/* Scrollbar minimalistisch */
-::-webkit-scrollbar {
-  width: 6px;
-  height: 6px;
+/* Input/Field */
+.input {
+  @apply rounded-xl border-neutral-300 dark:border-neutral-700 bg-white dark:bg-neutral-900 text-sm;
 }
-::-webkit-scrollbar-thumb {
-  background: var(--border);
-  border-radius: 3px;
+.textarea {
+  @apply rounded-xl border-neutral-300 dark:border-neutral-700 bg-white dark:bg-neutral-900 text-sm;
+}
+
+/* Simple utility */
+.section-title {
+  @apply text-lg font-semibold text-neutral-900 dark:text-neutral-100;
+}
+.muted {
+  @apply text-neutral-600 dark:text-neutral-400;
 }

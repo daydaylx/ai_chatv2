@@ -1,28 +1,13 @@
-export type Role = "user" | "assistant" | "system";
+export type ThemeMode = "system" | "light" | "dark";
 
-export interface Message {
-  id: string;
-  role: Role;
-  content: string;
-  ts: number; // epoch ms
-}
-
-export interface ChatSummary {
-  id: string;
-  title: string;
-  updatedAt: number;
-  lastSnippet: string;
-}
-
-export interface ModelInfo {
-  id: string;
-  label: string;
-  provider?: string;
-  context?: number;
-}
-
-export interface StyleTemplate {
+export interface StylePreset {
   id: string;
   name: string;
-  system: string;
+  description?: string;
+  tags: string[];
+  systemPrompt: string;
+  temperature: number;   // 0..2 (optional nutzbar)
+  topP: number;          // 0..1
+  createdAt: string;     // ISO
+  updatedAt: string;     // ISO
 }

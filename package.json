@@ -1,37 +1,27 @@
 {
-  "name": "ai-chat-greenfield-ui",
+  "name": "ai-chat-mobile-pwa",
   "private": true,
-  "version": "1.1.5",
   "type": "module",
   "scripts": {
     "dev": "vite",
     "build": "vite build",
-    "lint": "eslint . --max-warnings=0",
     "preview": "vite preview",
-    "typecheck": "tsc --noEmit",
-    "test": "vitest run"
+    "typecheck": "tsc --noEmit"
   },
   "dependencies": {
-    "clsx": "^2.1.1",
-    "framer-motion": "^11.2.10",
     "react": "^18.3.1",
     "react-dom": "^18.3.1",
-    "zustand": "^4.5.7"
+    "react-router-dom": "^6.26.2"
   },
   "devDependencies": {
-    "@tailwindcss/forms": "^0.5.10",
-    "@testing-library/jest-dom": "^6.4.8",
-    "@testing-library/react": "^16.0.0",
-    "@types/node": "^20.14.12",
-    "@types/react": "^18.3.5",
+    "@tailwindcss/forms": "^0.5.9",
+    "@types/react": "^18.3.11",
     "@types/react-dom": "^18.3.0",
-    "@vitejs/plugin-react": "^4.3.2",
-    "autoprefixer": "^10.4.21",
-    "eslint": "^8.57.0",
-    "postcss": "^8.5.6",
-    "tailwindcss": "^3.4.17",
-    "typescript": "^5.5.4",
-    "vite": "^5.4.9",
-    "vitest": "^1.6.0"
+    "@vitejs/plugin-react": "^4.3.3",
+    "autoprefixer": "^10.4.20",
+    "postcss": "^8.4.45",
+    "tailwindcss": "^3.4.10",
+    "typescript": "^5.6.2",
+    "vite": "^5.4.8"
   }
 }

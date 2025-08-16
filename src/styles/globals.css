@@ -72,10 +72,21 @@
     @apply bg-gradient-to-r from-primary via-purple-400 to-pink-400 bg-clip-text text-transparent;
   }
   .glass {
-    @apply bg-card/40 backdrop-blur-xl border border-white/10 shadow-glass;
+    /* HINWEIS: kein @apply shadow-glass mehr – direkter box-shadow für CI-Stabilität */
+    @apply bg-card/40 backdrop-blur-xl border border-white/10;
+    box-shadow: 0 8px 32px rgba(0,0,0,.24);
   }
-  .android-scrollbar::-webkit-scrollbar { width: 6px; height: 6px; }
-  .android-scrollbar::-webkit-scrollbar-thumb { @apply bg-muted/30 rounded-full; }
+}
+
+/* Custom Scrollbar (ohne @apply für CI-Stabilität) */
+.android-scrollbar::-webkit-scrollbar { width: 6px; height: 6px; }
+.android-scrollbar::-webkit-scrollbar-track { background: transparent; }
+.android-scrollbar::-webkit-scrollbar-thumb {
+  border-radius: 9999px;
+  background-color: hsl(var(--muted) / 0.30);
+}
+.android-scrollbar::-webkit-scrollbar-thumb:hover {
+  background-color: hsl(var(--muted) / 0.50);
 }
 
 /* Composer / FAB */
@@ -93,7 +104,7 @@
 .loading-dots span:nth-child(2) { animation-delay: .2s; }
 .loading-dots span:nth-child(3) { animation-delay: .4s; }
 
-/* Schönere Default-Formen (zusätzlich zu @tailwindcss/forms) */
+/* Bessere Form-Defaults */
 input[type="text"],
 textarea,
 select {

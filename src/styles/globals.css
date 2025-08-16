@@ -2,168 +2,103 @@
 @tailwind components;
 @tailwind utilities;
 
-/* ====== THEME (Brand: Disa) ====== */
+/* ================================
+   Disa AI Theme Tokens (HSL)
+   ================================ */
 @layer base {
   :root {
-    /* Brand Primaries */
-    --disa-primary: 263 70% 58%;
-    --disa-primary-ink: 210 40% 98%;
+    --background: 220 15% 6%;
+    --foreground: 210 20% 98%;
+    --card: 220 18% 10%;
+    --card-foreground: 210 20% 98%;
+    --primary: 263 70% 50%;
+    --primary-foreground: 210 40% 98%;
+    --secondary: 217 25% 18%;
+    --secondary-foreground: 210 40% 98%;
+    --muted: 217 20% 42%;
+    --muted-foreground: 215 16% 75%;
+    --accent: 263 70% 50%;
+    --accent-foreground: 210 40% 98%;
+    --destructive: 0 84% 60%;
+    --destructive-foreground: 0 0% 100%;
+    --border: 218 18% 22%;
+    --input: 218 18% 22%;
+    --ring: 263 70% 50%;
 
-    /* Surfaces */
-    --disa-bg: 220 40% 3%;
-    --disa-bg-soft: 222 32% 8%;
-    --disa-surface: 217 33% 14%;
-    --disa-surface-2: 217 33% 18%;
-    --disa-border: 217 33% 24%;
-
-    /* Text */
-    --disa-ink: 210 40% 98%;
-    --disa-ink-dim: 215 18% 75%;
-
-    /* Semantic */
-    --disa-destructive: 0 83% 60%;
-    --disa-ok: 143 60% 45%;
-
-    /* Chat bubbles */
-    --disa-bubble-user: 257 84% 62%;
-    --disa-bubble-assistant: 230 16% 18%;
+    /* Disa Status */
+    --disa-ok: 142 72% 45%;
+    --disa-warn: 42 95% 55%;
   }
 
   .light {
-    --disa-bg: 0 0% 100%;
-    --disa-bg-soft: 0 0% 98%;
-    --disa-surface: 0 0% 96%;
-    --disa-surface-2: 0 0% 92%;
-    --disa-border: 214 32% 87%;
-    --disa-ink: 220 20% 10%;
-    --disa-ink-dim: 220 10% 40%;
-
-    --disa-bubble-user: 260 85% 62%;
-    --disa-bubble-assistant: 240 16% 96%;
-  }
-
-  :root {
-    /* Map -> Tailwind tokens */
-    --background: var(--disa-bg);
-    --foreground: var(--disa-ink);
-    --card: var(--disa-surface);
-    --card-foreground: var(--disa-ink);
-    --primary: var(--disa-primary);
-    --primary-foreground: var(--disa-primary-ink);
-    --secondary: var(--disa-surface-2);
-    --secondary-foreground: var(--disa-ink);
-    --muted: 217 18% 35%;
-    --muted-foreground: var(--disa-ink-dim);
-    --accent: var(--disa-primary);
-    --accent-foreground: var(--disa-primary-ink);
-    --destructive: var(--disa-destructive);
-    --destructive-foreground: 210 40% 98%;
-    --border: var(--disa-border);
-    --input: var(--disa-border);
-    --ring: var(--disa-primary);
+    --background: 0 0% 100%;
+    --foreground: 220 15% 8%;
+    --card: 0 0% 100%;
+    --card-foreground: 220 15% 8%;
+    --primary: 263 70% 50%;
+    --primary-foreground: 0 0% 100%;
+    --secondary: 215 30% 95%;
+    --secondary-foreground: 220 15% 12%;
+    --muted: 215 16% 47%;
+    --muted-foreground: 220 10% 35%;
+    --accent: 263 70% 50%;
+    --accent-foreground: 0 0% 100%;
+    --destructive: 0 84% 55%;
+    --destructive-foreground: 0 0% 100%;
+    --border: 214 32% 88%;
+    --input: 214 32% 88%;
+    --ring: 263 70% 50%;
   }
 }
 
-/* ====== BASE ====== */
 @layer base {
-  * {
-    @apply border-border;
-  }
+  * { @apply border-border; }
+
+  html, body, #root { height: 100%; }
 
   body {
-    @apply bg-background text-foreground;
+    @apply bg-background text-foreground antialiased;
     font-feature-settings: "rlig" 1, "calt" 1;
     overscroll-behavior-y: contain;
     -webkit-tap-highlight-color: transparent;
   }
-
-  /* Root height for mobile 100dvh layouts */
-  html, body, #root { height: 100%; }
-
-  /* Momentum scrolling on iOS */
-  .-webkit-overflow-scrolling-touch { -webkit-overflow-scrolling: touch; }
 }
 
-/* ====== UTILITIES / COMPONENT SKINS ====== */
+/* ================================
+   Utilities & Komponenten
+   ================================ */
 @layer utilities {
-  .glass {
-    @apply bg-card/30 backdrop-blur-xl border border-white/10;
-  }
-  .glass-heavy {
-    @apply bg-card/50 backdrop-blur-2xl border border-white/20;
-  }
-
   .text-gradient {
-    @apply bg-gradient-to-r from-primary via-fuchsia-400 to-rose-400 bg-clip-text text-transparent;
+    @apply bg-gradient-to-r from-primary via-purple-400 to-pink-400 bg-clip-text text-transparent;
   }
-
-  .shadow-soft {
-    box-shadow: 0 4px 22px rgba(0,0,0,0.25);
+  .glass {
+    @apply bg-card/40 backdrop-blur-xl border border-white/10 shadow-glass;
   }
-
-  /* Signature bubble shapes */
-  .bubble-shell {
-    @apply rounded-2xl px-4 py-3 leading-relaxed break-words;
-  }
-  .bubble-user {
-    @apply bubble-shell text-white;
-    background: linear-gradient(135deg, hsl(var(--disa-bubble-user)) 0%, hsl(var(--disa-bubble-user)/.85) 100%);
-    border-radius: 18px 18px 6px 18px; /* distinctive corner cut */
-  }
-  .bubble-assistant {
-    @apply bubble-shell border border-border/60 bg-secondary/60;
-    border-radius: 18px 18px 18px 6px;
-  }
-
-  /* Typing indicator bubble */
-  .typing-bubble {
-    @apply bubble-assistant flex items-center gap-1;
-  }
-  .typing-dot {
-    @apply w-2 h-2 rounded-full bg-muted-foreground;
-    animation: typing 1.4s infinite both;
-  }
-  .typing-dot:nth-child(2) { animation-delay: .15s; }
-  .typing-dot:nth-child(3) { animation-delay: .3s; }
-  @keyframes typing {
-    0%, 60%, 100% { transform: translateY(0); opacity: .5; }
-    30% { transform: translateY(-4px); opacity: 1; }
-  }
-
-  /* Send FAB (bigger touch-target, signature shape) */
-  .fab-send {
-    @apply h-12 w-12 md:h-12 md:w-12 rounded-2xl flex items-center justify-center text-white;
-    background: linear-gradient(135deg, hsl(var(--disa-primary)) 0%, hsl(var(--disa-primary)/.8) 100%);
-    box-shadow: 0 8px 22px hsl(var(--disa-primary)/.35);
-    transition: transform .12s ease, box-shadow .2s ease, filter .2s ease;
-  }
-  .fab-send:active { transform: translateY(1px) scale(.98); filter: brightness(.98); }
-
-  /* Ripple-ish press feedback (pure CSS) */
-  .ripple {
-    position: relative;
-    overflow: hidden;
-  }
-  .ripple:after {
-    content: "";
-    position: absolute;
-    inset: 0;
-    background-image: radial-gradient(circle, rgba(255,255,255,.35) 10%, transparent 10.01%);
-    background-repeat: no-repeat;
-    background-position: 50%;
-    transform: scale(10);
-    opacity: 0;
-    transition: transform .5s, opacity .9s;
-  }
-  .ripple:active:after { transform: scale(0); opacity: .35; transition: 0s; }
+  .android-scrollbar::-webkit-scrollbar { width: 6px; height: 6px; }
+  .android-scrollbar::-webkit-scrollbar-thumb { @apply bg-muted/30 rounded-full; }
 }
 
-/* ====== SCROLLBAR ====== */
-::-webkit-scrollbar { width: 6px; height: 6px; }
-::-webkit-scrollbar-track { @apply bg-transparent; }
-::-webkit-scrollbar-thumb { @apply bg-muted/30 rounded-full; }
-::-webkit-scrollbar-thumb:hover { @apply bg-muted/50; }
+/* Composer / FAB */
+.fab-send {
+  @apply fixed right-4 bottom-24 md:bottom-28 rounded-2xl h-14 w-14 flex items-center justify-center 
+         bg-primary text-primary-foreground shadow-lg transition-all;
+}
+.fab-send:active { transform: scale(.97); }
 
-/* ====== GLOBAL ANIMS ====== */
-html { scroll-behavior: smooth; }
-*:focus-visible { @apply outline-none ring-2 ring-ring ring-offset-2 ring-offset-background; }
+/* Loading dots */
+.loading-dots span {
+  @apply inline-block h-2 w-2 rounded-full bg-muted-foreground;
+  animation: loading-dot 1.4s infinite both;
+}
+.loading-dots span:nth-child(2) { animation-delay: .2s; }
+.loading-dots span:nth-child(3) { animation-delay: .4s; }
+
+/* Schönere Default-Formen (zusätzlich zu @tailwindcss/forms) */
+input[type="text"],
+textarea,
+select {
+  @apply bg-secondary/60 text-foreground placeholder:text-muted-foreground 
+         border border-border/60 rounded-xl outline-none focus:border-primary/60 
+         focus:ring-2 focus:ring-primary/30;
+}
+button { @apply select-none; }

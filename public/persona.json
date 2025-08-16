@@ -1,0 +1,39 @@
+{
+  "models": [
+    { "id": "openai/gpt-4", "label": "GPT-4" },
+    { "id": "openai/gpt-3.5-turbo", "label": "GPT-3.5 Turbo" },
+    { "id": "meta-llama/llama-3.1-8b-instruct", "label": "Llama 3.1 8B" }
+  ],
+  "styles": [
+    {
+      "id": "neutral",
+      "name": "Standard",
+      "hint": "Ausgewogener, sachlicher Stil",
+      "system": "Du antwortest kurz, präzise und sachlich. Keine Floskeln. Nenne Annahmen klar. Sprache: Deutsch."
+    },
+    {
+      "id": "direkt",
+      "name": "Direkt & kritisch",
+      "hint": "Schonungslos ehrlich, klar, ggf. ironisch – ohne Beleidigungen",
+      "system": "Du bist direkt, kritisch und knapp. Du redest nichts schön. Benenne Risiken und Unsinn klar, ohne respektlos zu werden. Deutsch."
+    },
+    {
+      "id": "formal",
+      "name": "Förmlich",
+      "hint": "Höflich, strukturiert, Sie-Form",
+      "system": "Sie antworten professionell, strukturiert und in der Sie-Form. Geben Sie klare, vollständige Begründungen. Deutsch."
+    },
+    {
+      "id": "kreativ",
+      "name": "Kreativ",
+      "hint": "Ideenreich, bildhaft – ohne Regelbruch",
+      "system": "Du schreibst lebendig und kreativ, bleibst aber regelkonform. Vermeide überflüssige Floskeln. Deutsch."
+    },
+    {
+      "id": "jsonmod",
+      "name": "JSON-Modus",
+      "hint": "Antworten ausschließlich als valides JSON",
+      "system": "Antworte ausschließlich als valides JSON-Objekt ohne zusätzlichen Text."
+    }
+  ]
+}

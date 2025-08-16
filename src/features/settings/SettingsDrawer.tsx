@@ -1,16 +1,6 @@
-import { useEffect, useMemo, useState } from "react";
 import { AnimatePresence, motion } from "framer-motion";
-import ModelPicker from "@/features/models/ModelPicker";
-import type { OpenRouterClient } from "@/lib/openrouter";
-
-type ModelInfo = {
-  id: string;
-  name?: string;
-  label?: string;
-  vendor?: string;
-  family?: string;
-  group?: string;
-};
+import { useEffect, useMemo, useState } from "react";
+import { OpenRouterClient } from "@/lib/openrouter";
 
 type Props = {
   open: boolean;
@@ -19,9 +9,6 @@ type Props = {
   modelId: string;
   onModelChange: (id: string) => void;
   onKeyChanged: () => void;
-  personaLabel?: string;
-  onOpenPersona: () => void;
-  models?: ModelInfo[];
 };
 
 export default function SettingsDrawer({
@@ -30,49 +17,30 @@ export default function SettingsDrawer({
   client,
   modelId,
   onModelChange,
-  onKeyChanged,
-  personaLabel,
-  onOpenPersona,
-  models: modelsProp,
+  onKeyChanged
 }: Props) {
-  const [key, setKey] = useState<string>(() => client.getApiKey() ?? "");
-  const [loadingModels, setLoadingModels] = useState(false);
-  const [models, setModels] = useState<ModelInfo[]>(modelsProp ?? []);
+  const [key, setKey] = useState<string>(() => client.getApiKey() || "");
+  const [models, setModels] = useState<{ id: string; name: string; provider?: string }[]>([]);
 
   useEffect(() => {
-    let ignore = false;
-    async function load() {
-      if (modelsProp && modelsProp.length) return;
-      setLoadingModels(true);
-      try {
-        const res = await fetch("/models.json", { cache: "no-cache" });
-        const data = (await res.json()) as ModelInfo[] | { models: ModelInfo[] };
-        const list = Array.isArray(data) ? data : data.models ?? [];
-        if (!ignore) setModels(list);
-      } catch {
-      } finally {
-        if (!ignore) setLoadingModels(false);
-      }
-    }
-    load();
-    return () => {
-      ignore = true;
-    };
-  }, [modelsProp]);
+    client.listModels().then(setModels).catch(() => setModels([]));
+  }, [client]);
 
-  const currentLabel = useMemo(() => {
-    const m = models.find((x) => x.id === modelId);
-    return m?.name || m?.label || modelId || "–";
-  }, [models, modelId]);
+  const grouped = useMemo(() => {
+    const map = new Map<string, { id: string; name: string; provider?: string }[]>();
+    for (const m of models) {
+      const g = m.provider ?? "Andere";
+      map.set(g, [...(map.get(g) ?? []), m]);
+    }
+    return [...map.entries()];
+  }, [models]);
 
   function saveKey() {
-    client.setApiKey(key.trim());
-    onKeyChanged();
-  }
-
-  function clearKey() {
-    setKey("");
-    client.setApiKey("");
+    if (key.trim()) {
+      client.setApiKey(key.trim());
+    } else {
+      client.clearApiKey();
+    }
     onKeyChanged();
   }
 
@@ -81,67 +49,31 @@ export default function SettingsDrawer({
   return (
     <AnimatePresence>
       <motion.div
-        className="fixed inset-0 z-50 flex items-end md:items-center justify-center"
+        className="fixed inset-0 z-40 bg-black/60 backdrop-blur-sm"
         initial={{ opacity: 0 }}
         animate={{ opacity: 1 }}
-        exit={{ opacity: 0 }}
+        onClick={onClose}
+      />
+      <motion.div
+        className="fixed bottom-0 left-0 right-0 z-50 rounded-t-2xl border border-border bg-background p-4 pb-[max(16px,env(safe-area-inset-bottom))] shadow-2xl"
+        initial={{ y: "100%" }}
+        animate={{ y: 0 }}
+        exit={{ y: "100%" }}
+        transition={{ type: "spring", damping: 26, stiffness: 300 }}
       >
-        <div
-          className="absolute inset-0 bg-black/60 backdrop-blur-sm"
-          onClick={onClose}
-        />
-        <motion.div
-          className="relative z-10 w-full md:max-w-lg rounded-t-2xl md:rounded-2xl border border-border bg-background p-4 md:p-6"
-          initial={{ y: 40, opacity: 0 }}
-          animate={{ y: 0, opacity: 1 }}
-          exit={{ y: 40, opacity: 0 }}
-          transition={{ type: "spring", stiffness: 260, damping: 28 }}
-        >
-          <div className="mb-4 flex items-center justify-between">
-            <h2 className="text-lg font-semibold">Einstellungen</h2>
-            <motion.button
-              whileTap={{ scale: 0.95 }}
-              onClick={onClose}
-              className="h-9 w-9 rounded-lg border border-border/60 bg-secondary/60 text-muted-foreground hover:text-foreground"
-              aria-label="Schließen"
-            >
-              <svg className="mx-auto h-5 w-5" viewBox="0 0 24 24" stroke="currentColor" fill="none">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12"/>
-              </svg>
-            </motion.button>
-          </div>
+        <div className="mx-auto max-w-2xl">
+          <h2 className="mb-4 text-lg font-semibold">Einstellungen</h2>
 
-          {/* Persona */}
+          {/* API Key */}
           <div className="mb-6">
-            <div className="mb-2 text-sm font-medium">Antwort-Stil (Persona)</div>
-            <div className="flex items-center justify-between rounded-xl border border-border/60 bg-secondary/60 px-3 py-2">
-              <div className="text-sm">
-                {personaLabel ? (
-                  <span className="text-foreground">{personaLabel}</span>
-                ) : (
-                  <span className="text-muted-foreground">Keine Persona gewählt</span>
-                )}
-              </div>
-              <button
-                onClick={onOpenPersona}
-                className="rounded-lg border border-border/60 bg-background/70 px-3 py-1 text-sm hover:bg-secondary/50"
-              >
-                Ändern
-              </button>
-            </div>
-          </div>
-
-          {/* API-Key */}
-          <div className="mb-6">
-            <div className="mb-2 text-sm font-medium">OpenRouter API-Key</div>
-            <div className="flex items-center gap-2">
-              <input
-                type="password"
-                value={key}
-                onChange={(e) => setKey(e.target.value)}
-                placeholder="sk-or-v1-..."
-                className="flex-1 rounded-xl border border-border/60 bg-secondary/60 px-3 py-2 outline-none focus:border-primary/60 focus:ring-2 focus:ring-primary/30"
-              />
+            <label className="mb-1 block text-sm text-muted-foreground">OpenRouter API-Key</label>
+            <input
+              className="w-full rounded-xl border border-border/60 bg-secondary/60 px-3 py-2"
+              placeholder="sk-or-v1-..."
+              value={key}
+              onChange={(e) => setKey(e.target.value)}
+            />
+            <div className="mt-2 flex gap-2">
               <button
                 onClick={saveKey}
                 className="rounded-lg bg-primary px-3 py-2 text-sm font-medium text-primary-foreground hover:bg-primary/90"
@@ -149,31 +81,40 @@ export default function SettingsDrawer({
                 Speichern
               </button>
               <button
-                onClick={clearKey}
-                className="rounded-lg border border-destructive/40 bg-destructive/10 px-3 py-2 text-sm text-destructive hover:bg-destructive/20"
+                onClick={() => {
+                  client.clearApiKey();
+                  setKey("");
+                  onKeyChanged();
+                }}
+                className="rounded-lg border border-border/60 bg-secondary/60 px-3 py-2 text-sm text-muted-foreground hover:text-foreground"
               >
                 Entfernen
               </button>
-            </div>
-            <div className="mt-1 text-xs text-muted-foreground">
-              Status: {key ? "gesetzt" : "nicht gesetzt"}
             </div>
           </div>
 
           {/* Model */}
           <div className="mb-6">
-            <div className="mb-2 text-sm font-medium">Modell</div>
-            <ModelPicker
+            <label className="mb-1 block text-sm text-muted-foreground">Modell</label>
+            <select
+              className="w-full rounded-xl border border-border/60 bg-secondary/60 px-3 py-2"
               value={modelId}
-              onChange={onModelChange}
-              models={models}
-              loading={loadingModels}
-            />
-            <div className="mt-1 text-xs text-muted-foreground">Aktuell: {currentLabel}</div>
+              onChange={(e) => onModelChange(e.target.value)}
+            >
+              <option value="">– Modell wählen –</option>
+              {grouped.map(([group, list]) => (
+                <optgroup key={group} label={group}>
+                  {list.map((m) => (
+                    <option key={m.id} value={m.id}>
+                      {m.name}
+                    </option>
+                  ))}
+                </optgroup>
+              ))}
+            </select>
           </div>
 
-          {/* Footer */}
-          <div className="flex justify-end gap-2">
+          <div className="flex justify-end">
             <button
               onClick={onClose}
               className="rounded-xl border border-border/60 bg-secondary/60 px-3 py-2 text-sm text-muted-foreground hover:text-foreground"
@@ -181,7 +122,7 @@ export default function SettingsDrawer({
               Fertig
             </button>
           </div>
-        </motion.div>
+        </div>
       </motion.div>
     </AnimatePresence>
   );

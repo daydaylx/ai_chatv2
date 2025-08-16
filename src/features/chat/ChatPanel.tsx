@@ -1,10 +1,33 @@
-import { useEffect, useMemo, useRef, useState, type KeyboardEvent as ReactKeyboardEvent } from "react";
+import {
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+  type KeyboardEvent as ReactKeyboardEvent
+} from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import clsx from "clsx";
-import { useChatStore } from "@/stores/chat-store";
+import { useChatStore } from "@/entities/chat/store";
+import type { ORMessage } from "@/lib/openrouter";
+import { OpenRouterClient } from "@/lib/openrouter";
 
-export default function ChatPanel() {
-  const currentChat = useChatStore((s) => s.currentChat);
+type Props = {
+  client: OpenRouterClient;
+  modelId: string;
+  apiKeyPresent: boolean;
+  onOpenSettings: () => void;
+  systemPrompt?: string;
+  onOpenChats?: () => void;
+};
+
+export default function ChatPanel({
+  client,
+  modelId,
+  apiKeyPresent,
+  onOpenSettings,
+  systemPrompt
+}: Props) {
+  const currentChat = useChatStore((s) => s.currentChat());
   const chatId = currentChat?.id ?? null;
   const messages = useChatStore((s) => s.listMessages(chatId));
   const addMessage = useChatStore((s) => s.addMessage);
@@ -16,6 +39,7 @@ export default function ChatPanel() {
 
   const disabledReason = useMemo(() => {
     if (!chatId) return "Kein Chat ausgewählt";
+    // Wir lassen Senden auch ohne Key/Modell zu (Mock-Mode).
     return "";
   }, [chatId]);
 
@@ -37,6 +61,36 @@ export default function ChatPanel() {
     el.scrollTop = el.scrollHeight + 1000;
   }, [messages, busy]);
 
+  async function send() {
+    if (busy || !input.trim() || !chatId) return;
+
+    const trimmed = input.trim();
+    setInput("");
+
+    // user message in store
+    const user = addMessage(chatId, { role: "user", content: trimmed });
+
+    setBusy(true);
+    try {
+      const historyMsgs = messages.map(({ role, content }) => ({ role, content })) as ORMessage[];
+      const baseMsgs = systemPrompt ? [{ role: "system", content: systemPrompt } as ORMessage, ...historyMsgs] : historyMsgs;
+
+      const res = await client.chat({
+        model: modelId,
+        messages: [...baseMsgs, { role: "user", content: user.content }],
+        temperature: 0.7,
+        max_tokens: 1024
+      });
+
+      addMessage(chatId, { role: "assistant", content: res.content });
+    } catch (e: any) {
+      addMessage(chatId, { role: "assistant", content: `❌ ${e?.message ?? String(e)}` });
+    } finally {
+      setBusy(false);
+      setTimeout(() => taRef.current?.focus(), 0);
+    }
+  }
+
   function handleKey(e: ReactKeyboardEvent<HTMLTextAreaElement>) {
     if (e.key === "Enter" && !e.shiftKey) {
       e.preventDefault();
@@ -44,42 +98,35 @@ export default function ChatPanel() {
     }
   }
 
-  async function send() {
-    if (busy || !input.trim() || !chatId) return;
-    const trimmed = input.trim();
-    setInput("");
-    setBusy(true);
-    try {
-      addMessage(chatId, { role: "user", content: trimmed });
-      // hier könnte API-Aufruf folgen; vorerst Demo-Antwort:
-      await new Promise((r) => setTimeout(r, 300));
-      addMessage(chatId, { role: "assistant", content: "👍 Verstanden." });
-    } finally {
-      setBusy(false);
-      setTimeout(() => taRef.current?.focus(), 0);
-    }
-  }
-
   const renderItems = messages.filter((m) => m.role !== "system");
 
   return (
     <div className="flex h-full min-h-0 flex-col">
+      {/* Hinweisleiste, wenn Key/Modell fehlen (Mock-Mode ist aktiv) */}
       <AnimatePresence>
-        {disabledReason && (
+        {!apiKeyPresent || !modelId ? (
           <motion.div
             initial={{ height: 0, opacity: 0 }}
             animate={{ height: "auto", opacity: 1 }}
             exit={{ height: 0, opacity: 0 }}
             className="overflow-hidden"
           >
-            <div className="flex items-center justify-between border-b border-destructive/20 bg-destructive/10 px-4 py-3">
-              <span className="text-sm text-destructive">{disabledReason}</span>
-              <span className="text-xs text-muted-foreground">Erstelle oben einen neuen Chat</span>
+            <div className="flex items-center justify-between border-b border-amber-400/20 bg-amber-400/10 px-4 py-3">
+              <span className="text-sm text-amber-300">
+                Demo-Modus aktiv (kein API-Key/Modell). Öffne die Einstellungen und trage deinen OpenRouter-Key ein.
+              </span>
+              <button
+                onClick={onOpenSettings}
+                className="rounded-lg bg-amber-500/20 px-3 py-1 text-xs font-medium text-amber-200 transition-colors hover:bg-amber-500/30"
+              >
+                Einstellungen
+              </button>
             </div>
           </motion.div>
-        )}
+        ) : null}
       </AnimatePresence>
 
+      {/* Scrollbereich */}
       <div
         ref={listRef}
         className="scroll-smooth overscroll-y-contain -webkit-overflow-scrolling-touch flex-1 min-h-0 overflow-y-auto px-4 py-6 pb-28 md:py-8 md:pb-32"
@@ -92,7 +139,7 @@ export default function ChatPanel() {
                 initial={{ opacity: 0, y: 20 }}
                 animate={{ opacity: 1, y: 0 }}
                 exit={{ opacity: 0, y: -20 }}
-                transition={{ duration: 0.25, delay: index * 0.04 }}
+                transition={{ duration: 0.3, delay: index * 0.05 }}
                 className={clsx("flex", item.role === "user" ? "justify-end" : "justify-start")}
               >
                 <div
@@ -110,7 +157,10 @@ export default function ChatPanel() {
                       item.role === "user" ? "text-right text-white" : ""
                     )}
                   >
-                    {new Date(item.createdAt).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}
+                    {new Date(item.createdAt).toLocaleTimeString([], {
+                      hour: "2-digit",
+                      minute: "2-digit"
+                    })}
                   </div>
                 </div>
               </motion.div>
@@ -131,11 +181,8 @@ export default function ChatPanel() {
         </div>
       </div>
 
-      <motion.div
-        initial={{ y: 20, opacity: 0 }}
-        animate={{ y: 0, opacity: 1 }}
-        className="sticky bottom-0 z-20 border-t border-border/50 bg-background/70 px-4 py-3 backdrop-blur-xl"
-      >
+      {/* Sticky Composer */}
+      <motion.div initial={{ y: 20, opacity: 0 }} animate={{ y: 0, opacity: 1 }} className="sticky bottom-0 z-20 border-t border-border/50 bg-background/70 px-4 py-3 backdrop-blur-xl">
         <div className="mx-auto flex max-w-3xl gap-3">
           <textarea
             ref={taRef}
@@ -154,10 +201,9 @@ export default function ChatPanel() {
             onClick={send}
             disabled={!!disabledReason || busy || !input.trim()}
             className={clsx(
-              "flex h-12 w-12 items-center justify-center rounded-xl transition-all",
-              !disabledReason && !busy && input.trim()
-                ? "bg-gradient-to-br from-primary to-primary/80 text-white shadow-[0_0_15px_rgba(139,92,246,0.25)]"
-                : "cursor-not-allowed bg-secondary/60 text-muted-foreground opacity-60"
+              "fab-send",
+              (!!disabledReason || busy || !input.trim()) &&
+                "cursor-not-allowed !bg-secondary/60 !text-muted-foreground !shadow-none"
             )}
             aria-label="Senden"
           >

@@ -1,92 +1,179 @@
 import { create } from "zustand";
+import { persist, createJSONStorage } from "zustand/middleware";
 
-export type Role = "system" | "user" | "assistant";
-
-export interface ChatMessage {
+export type ChatMessage = {
   id: string;
-  role: Role;
+  role: "user" | "assistant" | "system";
   content: string;
   createdAt: number;
-}
+};
 
-export interface ChatSession {
+export type Chat = {
   id: string;
   title: string;
-  messages: ChatMessage[];
-  modelId: string;
-  persona?: string;
   createdAt: number;
+  updatedAt: number;
+  modelId?: string;
+  archived?: boolean;
+  summary?: string;
+};
+
+type ChatState = {
+  chats: Chat[];
+  currentChatId: string | null;
+  messages: Record<string, ChatMessage[]>;
+
+  // selectors
+  currentChat(): Chat | null;
+  listMessages(chatId: string | null): ChatMessage[];
+
+  // actions
+  createChat(init?: Partial<Chat>): string;
+  duplicateChat(id: string): string;
+  renameChat(id: string, title: string): void;
+  deleteChat(id: string): void;
+  setCurrentChat(id: string): void;
+  addMessage(chatId: string, msg: Partial<ChatMessage> & Pick<ChatMessage, "role" | "content">): ChatMessage;
+  clearChat(id: string): void;
+  updateChatMeta(id: string, meta: Partial<Pick<Chat, "modelId" | "archived" | "summary">>): void;
+};
+
+function uuid() {
+  if (typeof crypto !== "undefined" && "randomUUID" in crypto) return crypto.randomUUID();
+  return `${Date.now()}-${Math.random().toString(36).slice(2, 10)}`;
 }
 
-interface ChatState {
-  sessions: ChatSession[];
-  activeSessionId?: string;
+const initialChat = (): Chat => ({
+  id: uuid(),
+  title: "Neuer Chat",
+  createdAt: Date.now(),
+  updatedAt: Date.now()
+});
 
-  // Actions
-  createSession: (title?: string, modelId?: string, persona?: string) => void;
-  setActiveSession: (id: string) => void;
-  addMessage: (sessionId: string, message: ChatMessage) => void;
-  removeMessage: (sessionId: string, messageId: string) => void;
-  clearMessages: (sessionId: string) => void;
-  deleteSession: (id: string) => void;
-}
+export const useChatStore = create<ChatState>()(
+  persist(
+    (set, get) => ({
+      chats: [initialChat()],
+      currentChatId: null,
+      messages: {},
 
-export const useChatStore = create<ChatState>((set, get) => ({
-  sessions: [],
-  activeSessionId: undefined,
+      currentChat: () => {
+        const id = get().currentChatId ?? get().chats[0]?.id ?? null;
+        if (!id) return null;
+        return get().chats.find((c) => c.id === id) ?? null;
+      },
 
-  createSession: (title = "Neue Unterhaltung", modelId = "default", persona) => {
-    const newSession: ChatSession = {
-      id: crypto.randomUUID(),
-      title,
-      modelId,
-      persona,
-      messages: [],
-      createdAt: Date.now(),
-    };
-    set((state) => ({
-      sessions: [...state.sessions, newSession],
-      activeSessionId: newSession.id,
-    }));
-  },
+      listMessages: (chatId) => {
+        if (!chatId) return [];
+        return get().messages[chatId] ?? [];
+      },
 
-  setActiveSession: (id) => {
-    set(() => ({ activeSessionId: id }));
-  },
+      createChat: (init) => {
+        const chat: Chat = {
+          ...initialChat(),
+          ...init,
+          id: uuid(),
+          createdAt: Date.now(),
+          updatedAt: Date.now()
+        };
+        set((s) => ({
+          chats: [chat, ...s.chats],
+          currentChatId: chat.id
+        }));
+        return chat.id;
+      },
 
-  addMessage: (sessionId, message) => {
-    set((state) => ({
-      sessions: state.sessions.map((s) =>
-        s.id === sessionId ? { ...s, messages: [...s.messages, message] } : s
-      ),
-    }));
-  },
+      duplicateChat: (id) => {
+        const src = get().chats.find((c) => c.id === id);
+        if (!src) return get().createChat();
+        const dupId = uuid();
+        const dup: Chat = {
+          ...src,
+          id: dupId,
+          title: src.title + " (Kopie)",
+          createdAt: Date.now(),
+          updatedAt: Date.now()
+        };
+        set((s) => ({
+          chats: [dup, ...s.chats],
+          messages: { ...s.messages, [dupId]: [...(s.messages[id] ?? [])] },
+          currentChatId: dupId
+        }));
+        return dupId;
+      },
 
-  removeMessage: (sessionId, messageId) => {
-    set((state) => ({
-      sessions: state.sessions.map((s) =>
-        s.id === sessionId
-          ? { ...s, messages: s.messages.filter((m) => m.id !== messageId) }
-          : s
-      ),
-    }));
-  },
+      renameChat: (id, title) =>
+        set((s) => ({
+          chats: s.chats.map((c) => (c.id === id ? { ...c, title, updatedAt: Date.now() } : c))
+        })),
 
-  clearMessages: (sessionId) => {
-    set((state) => ({
-      sessions: state.sessions.map((s) =>
-        s.id === sessionId ? { ...s, messages: [] } : s
-      ),
-    }));
-  },
+      deleteChat: (id) =>
+        set((s) => {
+          const rest = s.chats.filter((c) => c.id !== id);
+          const msgs = { ...s.messages };
+          delete msgs[id];
+          const nextId = rest[0]?.id ?? null;
+          return {
+            chats: rest.length ? rest : [initialChat()],
+            messages: msgs,
+            currentChatId: nextId
+          };
+        }),
 
-  deleteSession: (id) => {
-    set((state) => {
-      const filtered = state.sessions.filter((s) => s.id !== id);
-      return {
-        sessions: filtered,
-        activeSessionId: filtered.length > 0 ? filtered[0].id : undefined,
-      };
-    });
-  },
-}));
+      setCurrentChat: (id) => set({ currentChatId: id }),
+
+      addMessage: (chatId, input) => {
+        const message: ChatMessage = {
+          id: input.id ?? uuid(),
+          createdAt: input.createdAt ?? Date.now(),
+          role: input.role,
+          content: input.content
+        };
+        set((s) => {
+          const list = s.messages[chatId] ?? [];
+          // Auto-Titel (erste User-Nachricht)
+          let chats = s.chats;
+          const chat = chats.find((c) => c.id === chatId);
+          if (chat) {
+            const shouldName =
+              chat.title === "Neuer Chat" &&
+              input.role === "user" &&
+              !list.some((m) => m.role === "user");
+            const newTitle = shouldName ? (input.content || "Neuer Chat").slice(0, 48) : chat.title;
+            chats = chats.map((c) =>
+              c.id === chatId ? { ...c, title: newTitle, updatedAt: Date.now() } : c
+            );
+          }
+          return {
+            chats,
+            messages: { ...s.messages, [chatId]: [...list, message] }
+          };
+        });
+        return message;
+      },
+
+      clearChat: (id) =>
+        set((s) => ({
+          messages: { ...s.messages, [id]: [] },
+          chats: s.chats.map((c) => (c.id === id ? { ...c, updatedAt: Date.now() } : c))
+        })),
+
+      updateChatMeta: (id, meta) =>
+        set((s) => ({
+          chats: s.chats.map((c) => (c.id === id ? { ...c, ...meta, updatedAt: Date.now() } : c))
+        }))
+    }),
+    {
+      name: "chat_store_v1",
+      storage: createJSONStorage(() => localStorage),
+      version: 1,
+      migrate: (state) => state as any,
+      onRehydrateStorage: () => (state) => {
+        const s = state as ChatState | undefined;
+        if (s && !s.currentChatId && s.chats[0]) {
+          s.currentChatId = s.chats[0].id;
+        }
+      }
+    }
+  )
+);

@@ -1,27 +1,27 @@
 import { motion } from "framer-motion";
 import clsx from "clsx";
-import { useChatStore } from "@/stores/chat-store";
+import { useChatStore } from "@/entities/chat/store";
 
 type Props = {
   title?: string;
-  keySet?: boolean;
+  keySet: boolean;
   modelLabel?: string;
-  onOpenSettings?: () => void;
-  theme?: "dark" | "light";
-  onToggleTheme?: () => void;
+  onOpenSettings: () => void;
+  theme: "dark" | "light";
+  onToggleTheme: () => void;
   onOpenChats?: () => void;
 };
 
-function HeaderComponent({
-  title = "AI Chat",
+export default function Header({
+  title = "Disa AI",
   keySet,
   modelLabel,
   onOpenSettings,
-  theme = "dark",
+  theme,
   onToggleTheme,
   onOpenChats
 }: Props) {
-  const current = useChatStore((s) => s.currentChat);
+  const current = useChatStore((s) => s.currentChat());
 
   return (
     <motion.header
@@ -34,7 +34,7 @@ function HeaderComponent({
           whileHover={{ scale: 1.05 }}
           whileTap={{ scale: 0.95 }}
           onClick={onOpenChats}
-          className="rounded-xl border border-border/60 bg-secondary/60 px-3 py-2 text-sm font-semibold text-gradient"
+          className="rounded-2xl border border-border/60 bg-secondary/60 px-3 py-2 text-sm font-semibold text-gradient"
         >
           {title.slice(0, 2)} …
         </motion.button>
@@ -103,11 +103,11 @@ function HeaderComponent({
           </svg>
         </motion.button>
 
-        <div className={clsx("h-2 w-2 rounded-full", keySet ? "bg-green-500 animate-pulse" : "bg-destructive")} />
+        <div
+          className={clsx("h-2 w-2 rounded-full", keySet ? "bg-[hsl(var(--disa-ok))] animate-pulse" : "bg-destructive")}
+          title={keySet ? "API-Key gesetzt" : "Kein API-Key"}
+        />
       </div>
     </motion.header>
   );
 }
-
-export const Header = HeaderComponent;
-export default HeaderComponent;

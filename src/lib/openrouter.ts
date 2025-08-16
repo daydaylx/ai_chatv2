@@ -1,107 +1,98 @@
-export type ChatMessage = { role: "system" | "user" | "assistant"; content: string };
+export type ORole = "system" | "user" | "assistant";
 
-export type OpenRouterModel = {
-  id: string;
-  name?: string;
-  vendor?: string;
-  context_length?: number;
+export type ORMessage = {
+  role: ORole;
+  content: string;
 };
 
-type ChatParams = {
+export type ChatOptions = {
   model: string;
-  messages: ChatMessage[];
+  messages: ORMessage[];
   temperature?: number;
   max_tokens?: number;
-  stream?: boolean;
-  onDelta?: (token: string) => void;
-  signal?: AbortSignal;
 };
 
+/** Ergänzt, damit alte Imports weiter kompilieren */
+export type OpenRouterModel = {
+  id: string;
+  name: string;
+  provider?: string;
+  label?: string;
+};
+
+const LS_KEY = "openrouter_api_key";
+
 export class OpenRouterClient {
-  private key: string | null;
-  constructor() {
-    this.key = (typeof localStorage !== "undefined" && localStorage.getItem("openrouter_api_key")) || null;
+  getApiKey(): string | null {
+    try {
+      return localStorage.getItem(LS_KEY);
+    } catch {
+      return null;
+    }
   }
-  getApiKey(): string {
-    return this.key ?? "";
+
+  setApiKey(key: string) {
+    localStorage.setItem(LS_KEY, key.trim());
   }
-  setApiKey(k: string) {
-    this.key = k;
-    if (typeof localStorage !== "undefined") localStorage.setItem("openrouter_api_key", k);
-  }
+
   clearApiKey() {
-    this.key = null;
-    if (typeof localStorage !== "undefined") localStorage.removeItem("openrouter_api_key");
+    localStorage.removeItem(LS_KEY);
   }
 
   async listModels(): Promise<OpenRouterModel[]> {
-    const headers: Record<string, string> = { "Content-Type": "application/json" };
-    if (this.key) headers["Authorization"] = "Bearer " + this.key;
+    // Schnell & stabil aus /public/models.json
     try {
-      const resp = await fetch("https://openrouter.ai/api/v1/models", { headers });
-      if (!resp.ok) throw new Error(String(resp.status));
-      const data = await resp.json();
-      const items = Array.isArray(data?.data) ? data.data : [];
-      return items.map((m: any) => ({
-        id: String(m?.id ?? ""),
-        name: String(m?.name ?? m?.id ?? ""),
-        vendor: String(m?.provider?.name ?? "").toLowerCase() || undefined,
-        context_length: Number(m?.context_length ?? 0) || undefined,
-      })).filter((m: OpenRouterModel) => !!m.id);
+      const res = await fetch("/models.json", { cache: "no-store" });
+      if (!res.ok) throw new Error("models.json not found");
+      const data = (await res.json()) as OpenRouterModel[];
+      return data;
     } catch {
       return [
-        { id: "openai/gpt-4o-mini", name: "GPT-4o mini", vendor: "openai", context_length: 128000 },
-        { id: "openai/gpt-4o", name: "GPT-4o", vendor: "openai", context_length: 128000 },
-        { id: "anthropic/claude-3.5-sonnet", name: "Claude 3.5 Sonnet", vendor: "anthropic", context_length: 200000 },
-        { id: "meta-llama/llama-3.1-8b-instruct", name: "Llama 3.1 8B Instruct", vendor: "meta", context_length: 128000 },
-        { id: "google/gemini-1.5-pro", name: "Gemini 1.5 Pro", vendor: "google", context_length: 1000000 }
+        { id: "google/gemini-1.5-flash", name: "Gemini 1.5 Flash", provider: "Google" },
+        { id: "openai/gpt-4o-mini", name: "GPT-4o mini", provider: "OpenAI" },
+        { id: "anthropic/claude-3.5-sonnet", name: "Claude 3.5 Sonnet", provider: "Anthropic" }
       ];
     }
   }
 
-  async chat(params: ChatParams): Promise<{ content: string }> {
-    const { model, messages, temperature = 0.7, max_tokens = 1024, stream, onDelta, signal } = params;
-    const body = { model, messages, temperature, max_tokens, stream: !!stream };
-    const headers: Record<string, string> = { "Content-Type": "application/json" };
-    if (this.key) headers["Authorization"] = "Bearer " + this.key;
+  async chat(opts: ChatOptions): Promise<{ content: string }> {
+    const apiKey = this.getApiKey();
+    const hasCreds = !!apiKey && !!opts.model;
 
-    const resp = await fetch("https://openrouter.ai/api/v1/chat/completions", {
+    // Mock-Mode: Falls kein Key/Modell gesetzt → lokale Demo-Antwort
+    if (!hasCreds) {
+      const lastUser = [...opts.messages].reverse().find((m) => m.role === "user")?.content ?? "";
+      const mock =
+        "💡 *Demo-Antwort (Mock-Mode)*\n\n" +
+        "Kein API-Key/Modell gesetzt. Öffne die Einstellungen (Zahnrad) und trage deinen OpenRouter-Key ein, " +
+        "wähle ein Modell – ab dann antwortet die Cloud-KI.\n\n" +
+        "Du hast geschrieben:\n“" + lastUser + "”";
+      await new Promise((r) => setTimeout(r, 500));
+      return { content: mock };
+    }
+
+    const res = await fetch("https://openrouter.ai/api/v1/chat/completions", {
       method: "POST",
-      headers,
-      body: JSON.stringify(body),
-      signal,
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${apiKey}`,
+        "HTTP-Referer": location.origin,
+        "X-Title": "Disa AI"
+      },
+      body: JSON.stringify({
+        model: opts.model,
+        messages: opts.messages,
+        temperature: opts.temperature ?? 0.7,
+        max_tokens: opts.max_tokens ?? 1024
+      })
     });
-    if (!resp.ok) {
-      const t = await resp.text().catch(() => "");
-      throw new Error("OpenRouter error: " + resp.status + " " + t);
-    }
 
-    if (stream) {
-      const reader = resp.body?.getReader();
-      if (!reader) throw new Error("Streaming not supported in this environment");
-      const decoder = new TextDecoder("utf-8");
-      let full = "";
-      while (true) {
-        const { done, value } = await reader.read();
-        if (done) break;
-        const chunk = decoder.decode(value, { stream: true });
-        for (const line of chunk.split("\n")) {
-          const trimmed = line.trim();
-          if (!trimmed.startsWith("data:")) continue;
-          const jsonStr = trimmed.slice(5).trim();
-          if (jsonStr === "[DONE]") continue;
-          try {
-            const json = JSON.parse(jsonStr);
-            const delta = json?.choices?.[0]?.delta?.content ?? "";
-            if (delta) { full += delta; onDelta?.(delta); }
-          } catch {}
-        }
-      }
-      return { content: full };
-    } else {
-      const data = await resp.json();
-      const content = data?.choices?.[0]?.message?.content ?? "";
-      return { content };
+    if (!res.ok) {
+      const text = await res.text().catch(() => "");
+      throw new Error(`OpenRouter ${res.status}: ${text || res.statusText}`);
     }
+    const data = await res.json();
+    const content = data?.choices?.[0]?.message?.content ?? "";
+    return { content };
   }
 }

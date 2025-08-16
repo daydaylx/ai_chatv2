@@ -1,19 +1,27 @@
-import { useMemo, useState, useEffect } from "react";
-import { motion } from "framer-motion";
-import type { OpenRouterModel } from "../../lib/openrouter";
-import { OpenRouterClient } from "../../lib/openrouter";
-import { useConfigStore } from "../../entities/config/store";
+import { useEffect, useMemo, useState } from "react";
+import { AnimatePresence, motion } from "framer-motion";
+import ModelPicker from "@/features/models/ModelPicker";
+import type { OpenRouterClient } from "@/lib/openrouter";
+
+type ModelInfo = {
+  id: string;
+  name?: string;
+  label?: string;
+  vendor?: string;
+  family?: string;
+  group?: string;
+};
 
 type Props = {
   open: boolean;
   onClose: () => void;
   client: OpenRouterClient;
-  modelId: string | "";
+  modelId: string;
   onModelChange: (id: string) => void;
   onKeyChanged: () => void;
   personaLabel?: string;
   onOpenPersona: () => void;
-  personaId: string;
+  models?: ModelInfo[];
 };
 
 export default function SettingsDrawer({
@@ -25,131 +33,156 @@ export default function SettingsDrawer({
   onKeyChanged,
   personaLabel,
   onOpenPersona,
+  models: modelsProp,
 }: Props) {
-  const [key, setKey] = useState<string>(() => client.getApiKey());
-  const { models, load, loaded, loading, reload } = useConfigStore();
+  const [key, setKey] = useState<string>(() => client.getApiKey() ?? "");
+  const [loadingModels, setLoadingModels] = useState(false);
+  const [models, setModels] = useState<ModelInfo[]>(modelsProp ?? []);
 
   useEffect(() => {
-    if (open && !loaded && !loading) void load();
-  }, [open, loaded, loading, load]);
+    let ignore = false;
+    async function load() {
+      if (modelsProp && modelsProp.length) return;
+      setLoadingModels(true);
+      try {
+        const res = await fetch("/models.json", { cache: "no-cache" });
+        const data = (await res.json()) as ModelInfo[] | { models: ModelInfo[] };
+        const list = Array.isArray(data) ? data : data.models ?? [];
+        if (!ignore) setModels(list);
+      } catch {
+      } finally {
+        if (!ignore) setLoadingModels(false);
+      }
+    }
+    load();
+    return () => {
+      ignore = true;
+    };
+  }, [modelsProp]);
 
-  const sorted = useMemo<OpenRouterModel[]>(
-    () => [...models].sort((a, b) => (a.vendor || "").localeCompare(b.vendor || "") || a.id.localeCompare(b.id)),
-    [models]
-  );
+  const currentLabel = useMemo(() => {
+    const m = models.find((x) => x.id === modelId);
+    return m?.name || m?.label || modelId || "–";
+  }, [models, modelId]);
 
   function saveKey() {
     client.setApiKey(key.trim());
     onKeyChanged();
   }
+
   function clearKey() {
-    client.clearApiKey();
     setKey("");
+    client.setApiKey("");
     onKeyChanged();
   }
 
   if (!open) return null;
 
   return (
-    <>
+    <AnimatePresence>
       <motion.div
-        className="fixed inset-0 z-40 bg-black/60 backdrop-blur-sm"
+        className="fixed inset-0 z-50 flex items-end md:items-center justify-center"
         initial={{ opacity: 0 }}
         animate={{ opacity: 1 }}
-        onClick={onClose}
-      />
-      <motion.aside
-        className="fixed right-0 top-0 z-50 h-full w-[92vw] max-w-md border-l border-border bg-background shadow-2xl"
-        initial={{ x: "100%" }}
-        animate={{ x: 0 }}
-        transition={{ type: "spring", damping: 26, stiffness: 300 }}
+        exit={{ opacity: 0 }}
       >
-        <div className="flex h-full flex-col">
-          <div className="flex items-center justify-between border-b border-border/60 px-4 py-3">
-            <div className="text-sm font-semibold">Einstellungen</div>
-            <button
-              className="rounded-lg border border-border/60 bg-secondary/60 px-3 py-1 text-sm"
+        <div
+          className="absolute inset-0 bg-black/60 backdrop-blur-sm"
+          onClick={onClose}
+        />
+        <motion.div
+          className="relative z-10 w-full md:max-w-lg rounded-t-2xl md:rounded-2xl border border-border bg-background p-4 md:p-6"
+          initial={{ y: 40, opacity: 0 }}
+          animate={{ y: 0, opacity: 1 }}
+          exit={{ y: 40, opacity: 0 }}
+          transition={{ type: "spring", stiffness: 260, damping: 28 }}
+        >
+          <div className="mb-4 flex items-center justify-between">
+            <h2 className="text-lg font-semibold">Einstellungen</h2>
+            <motion.button
+              whileTap={{ scale: 0.95 }}
               onClick={onClose}
+              className="h-9 w-9 rounded-lg border border-border/60 bg-secondary/60 text-muted-foreground hover:text-foreground"
+              aria-label="Schließen"
             >
-              Schließen
+              <svg className="mx-auto h-5 w-5" viewBox="0 0 24 24" stroke="currentColor" fill="none">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12"/>
+              </svg>
+            </motion.button>
+          </div>
+
+          {/* Persona */}
+          <div className="mb-6">
+            <div className="mb-2 text-sm font-medium">Antwort-Stil (Persona)</div>
+            <div className="flex items-center justify-between rounded-xl border border-border/60 bg-secondary/60 px-3 py-2">
+              <div className="text-sm">
+                {personaLabel ? (
+                  <span className="text-foreground">{personaLabel}</span>
+                ) : (
+                  <span className="text-muted-foreground">Keine Persona gewählt</span>
+                )}
+              </div>
+              <button
+                onClick={onOpenPersona}
+                className="rounded-lg border border-border/60 bg-background/70 px-3 py-1 text-sm hover:bg-secondary/50"
+              >
+                Ändern
+              </button>
+            </div>
+          </div>
+
+          {/* API-Key */}
+          <div className="mb-6">
+            <div className="mb-2 text-sm font-medium">OpenRouter API-Key</div>
+            <div className="flex items-center gap-2">
+              <input
+                type="password"
+                value={key}
+                onChange={(e) => setKey(e.target.value)}
+                placeholder="sk-or-v1-..."
+                className="flex-1 rounded-xl border border-border/60 bg-secondary/60 px-3 py-2 outline-none focus:border-primary/60 focus:ring-2 focus:ring-primary/30"
+              />
+              <button
+                onClick={saveKey}
+                className="rounded-lg bg-primary px-3 py-2 text-sm font-medium text-primary-foreground hover:bg-primary/90"
+              >
+                Speichern
+              </button>
+              <button
+                onClick={clearKey}
+                className="rounded-lg border border-destructive/40 bg-destructive/10 px-3 py-2 text-sm text-destructive hover:bg-destructive/20"
+              >
+                Entfernen
+              </button>
+            </div>
+            <div className="mt-1 text-xs text-muted-foreground">
+              Status: {key ? "gesetzt" : "nicht gesetzt"}
+            </div>
+          </div>
+
+          {/* Model */}
+          <div className="mb-6">
+            <div className="mb-2 text-sm font-medium">Modell</div>
+            <ModelPicker
+              value={modelId}
+              onChange={onModelChange}
+              models={models}
+              loading={loadingModels}
+            />
+            <div className="mt-1 text-xs text-muted-foreground">Aktuell: {currentLabel}</div>
+          </div>
+
+          {/* Footer */}
+          <div className="flex justify-end gap-2">
+            <button
+              onClick={onClose}
+              className="rounded-xl border border-border/60 bg-secondary/60 px-3 py-2 text-sm text-muted-foreground hover:text-foreground"
+            >
+              Fertig
             </button>
           </div>
-
-          <div className="flex-1 space-y-6 overflow-y-auto p-4">
-            {/* API Key */}
-            <section>
-              <div className="mb-2 text-sm font-medium">OpenRouter API Key</div>
-              <div className="flex gap-2">
-                <input
-                  value={key}
-                  onChange={(e) => setKey(e.target.value)}
-                  placeholder="sk-or-..."
-                  className="flex-1 rounded-xl border border-border/60 bg-secondary/60 px-3 py-2 text-sm outline-none focus:border-primary/60 focus:ring-2 focus:ring-primary/30"
-                />
-                <button
-                  onClick={saveKey}
-                  className="rounded-lg bg-primary px-3 py-2 text-sm font-medium text-primary-foreground hover:bg-primary/90"
-                >
-                  Speichern
-                </button>
-                <button
-                  onClick={clearKey}
-                  className="rounded-lg border border-destructive/40 bg-destructive/10 px-3 py-2 text-sm text-destructive hover:bg-destructive/20"
-                >
-                  Löschen
-                </button>
-              </div>
-            </section>
-
-            {/* Persona */}
-            <section>
-              <div className="mb-2 text-sm font-medium">Antwort-Stil</div>
-              <div className="flex items-center gap-2">
-                <div className="rounded-full border border-primary/20 bg-primary/10 px-3 py-1 text-xs font-medium text-primary">
-                  {personaLabel ?? "Neutral"}
-                </div>
-                <button
-                  onClick={onOpenPersona}
-                  className="rounded-lg border border-border/60 bg-secondary/60 px-3 py-2 text-sm"
-                >
-                  Auswählen…
-                </button>
-              </div>
-            </section>
-
-            {/* Modelle */}
-            <section>
-              <div className="mb-2 flex items-center justify-between">
-                <span className="text-sm font-medium">Modell</span>
-                <button
-                  onClick={() => reload()}
-                  className="rounded-lg border border-border/60 bg-secondary/60 px-2 py-1 text-xs"
-                >
-                  Neu laden
-                </button>
-              </div>
-              {!loaded ? (
-                <div className="text-sm text-muted-foreground">Lade Modelle…</div>
-              ) : (
-                <select
-                  className="w-full rounded-xl border border-border/60 bg-secondary/60 px-3 py-2 text-sm outline-none focus:border-primary/60 focus:ring-2 focus:ring-primary/30"
-                  value={modelId || ""}
-                  onChange={(e) => onModelChange(e.target.value)}
-                >
-                  <option value="" disabled>
-                    Modell wählen…
-                  </option>
-                  {sorted.map((m) => (
-                    <option key={m.id} value={m.id}>
-                      {(m.name || m.id) + (m.vendor ? ` — ${m.vendor}` : "")}
-                    </option>
-                  ))}
-                </select>
-              )}
-            </section>
-          </div>
-        </div>
-      </motion.aside>
-    </>
+        </motion.div>
+      </motion.div>
+    </AnimatePresence>
   );
 }

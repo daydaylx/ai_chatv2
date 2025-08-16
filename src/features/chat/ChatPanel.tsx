@@ -6,23 +6,11 @@ import {
   type KeyboardEvent as ReactKeyboardEvent,
 } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import type { ChatMessage as ORMessage } from "../../lib/openrouter";
-import { OpenRouterClient } from "../../lib/openrouter";
-import { PRESETS } from "../../lib/presets";
+import type { ChatMessage as ORMessage } from "@/lib/openrouter";
+import { OpenRouterClient } from "@/lib/openrouter";
+import { PRESETS } from "@/lib/presets";
 import clsx from "clsx";
-import { useChatStore } from "../../entities/chat/store";
-
-// ggf. vorhanden in deinem Projekt:
-import { useConfigStore } from "../../entities/config/store";
-import Bubble from "../../shared/ui/Bubble";
-import FAB from "../../shared/ui/FAB";
-
-import CodeBlock, {
-  parseMessageToSegments,
-  type Segment,
-} from "../../shared/ui/CodeBlock";
-import { usePullToRefresh } from "../../shared/hooks/usePullToRefresh";
-import { useEdgeSwipe } from "../../shared/hooks/useEdgeSwipe";
+import { useChatStore } from "@/entities/chat/store";
 
 type Props = {
   client: OpenRouterClient;
@@ -34,7 +22,8 @@ type Props = {
 };
 
 function uuid() {
-  if ((globalThis as any)?.crypto?.randomUUID) return (globalThis as any).crypto.randomUUID();
+  if ((globalThis as any)?.crypto?.randomUUID)
+    return (globalThis as any).crypto.randomUUID();
   return `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
 }
 
@@ -44,15 +33,11 @@ export default function ChatPanel({
   apiKeyPresent,
   onOpenSettings,
   personaId,
-  onOpenChats,
 }: Props) {
   const currentChat = useChatStore((s) => s.currentChat());
   const chatId = currentChat?.id ?? null;
   const messages = useChatStore((s) => s.listMessages(chatId));
   const addMessage = useChatStore((s) => s.addMessage);
-
-  // optional falls genutzt
-  const config = useConfigStore?.();
 
   const [input, setInput] = useState("");
   const [busy, setBusy] = useState(false);
@@ -70,21 +55,6 @@ export default function ChatPanel({
     if (!chatId) return "Kein Chat ausgewählt";
     return "";
   }, [apiKeyPresent, modelId, chatId]);
-
-  // Pull-to-Refresh: liefert offset/active zurück
-  const { offset } = usePullToRefresh(
-    listRef,
-    async () => {
-      // Beispiel: kleine Pause → „Refresh“-Feedback
-      await new Promise((r) => setTimeout(r, 350));
-    },
-    { distance: 80, maxPull: 120 }
-  );
-
-  // Edge-Swipe von links: Chatliste öffnen
-  useEdgeSwipe(() => {
-    onOpenChats?.();
-  }, { edge: "left", hotZone: 24, threshold: 60 });
 
   useEffect(() => {
     const ta = taRef.current;
@@ -170,68 +140,43 @@ export default function ChatPanel({
         )}
       </AnimatePresence>
 
-      {/* Scrollbereich – leichte visuelle Pull-Offset-Anwendung */}
       <div
         ref={listRef}
-        style={{ transform: offset ? `translateY(${offset}px)` : undefined }}
         className="scroll-smooth overscroll-y-contain -webkit-overflow-scrolling-touch flex-1 min-h-0 overflow-y-auto px-4 py-6 pb-28 md:py-8 md:pb-32"
       >
         <div className="mx-auto max-w-3xl space-y-4">
           <AnimatePresence mode="popLayout">
-            {renderItems.map((item, index) => {
-              const isUser = item.role === "user";
-              const segs: Segment[] = !isUser
-                ? parseMessageToSegments(item.content)
-                : [{ type: "text", value: item.content }];
-
-              return (
-                <motion.div
-                  key={item.id}
-                  initial={{ opacity: 0, y: 20 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  exit={{ opacity: 0, y: -20 }}
-                  transition={{ duration: 0.3, delay: index * 0.05 }}
-                  className={clsx("flex", isUser ? "justify-end" : "justify-start")}
+            {renderItems.map((item, index) => (
+              <motion.div
+                key={item.id}
+                initial={{ opacity: 0, y: 20 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0, y: -20 }}
+                transition={{ duration: 0.3, delay: index * 0.05 }}
+                className={clsx("flex", item.role === "user" ? "justify-end" : "justify-start")}
+              >
+                <div
+                  className={clsx(
+                    "max-w-[85%] md:max-w-[70%] rounded-2xl px-4 py-3",
+                    item.role === "user"
+                      ? "ml-8 bg-gradient-to-br from-primary to-primary/80 text-white"
+                      : "mr-8 border border-border/50 bg-secondary/50 backdrop-blur"
+                  )}
                 >
+                  <div className="whitespace-pre-wrap break-words text-sm md:text-base">
+                    {item.content}
+                  </div>
                   <div
                     className={clsx(
-                      "max-w-[85%] md:max-w-[70%] rounded-2xl px-4 py-3",
-                      isUser
-                        ? "ml-8 bg-gradient-to-br from-primary to-primary/80 text-white"
-                        : "mr-8 border border-border/50 bg-secondary/50 backdrop-blur"
+                      "mt-2 text-xs opacity-60",
+                      item.role === "user" ? "text-right text-white" : ""
                     )}
                   >
-                    {/* Segments rendern */}
-                    <div className="space-y-3">
-                      {segs.map((s: Segment, i: number) =>
-                        s.type === "code" ? (
-                          <CodeBlock key={i} code={s.value} lang={s.lang} />
-                        ) : (
-                          <div
-                            key={i}
-                            className="whitespace-pre-wrap break-words text-sm md:text-base"
-                          >
-                            {s.value}
-                          </div>
-                        )
-                      )}
-                    </div>
-
-                    <div
-                      className={clsx(
-                        "mt-2 text-xs opacity-60",
-                        isUser ? "text-right text-white" : ""
-                      )}
-                    >
-                      {new Date(item.ts).toLocaleTimeString([], {
-                        hour: "2-digit",
-                        minute: "2-digit",
-                      })}
-                    </div>
+                    {new Date(item.ts).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}
                   </div>
-                </motion.div>
-              );
-            })}
+                </div>
+              </motion.div>
+            ))}
           </AnimatePresence>
 
           {busy && (
@@ -252,7 +197,6 @@ export default function ChatPanel({
         </div>
       </div>
 
-      {/* Sticky Composer */}
       <motion.div
         initial={{ y: 20, opacity: 0 }}
         animate={{ y: 0, opacity: 1 }}

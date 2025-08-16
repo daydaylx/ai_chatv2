@@ -2,45 +2,74 @@
 @tailwind components;
 @tailwind utilities;
 
-/* ===== BRAND ===== */
+/* ====== THEME (Brand: Disa) ====== */
 @layer base {
   :root {
-    --background: 222 47% 6%;
-    --foreground: 210 40% 98%;
-    --card: 225 25% 12%;
-    --card-foreground: 210 40% 98%;
-    --primary: 265 80% 56%;
-    --primary-2: 295 75% 55%;
-    --accent: 190 90% 50%;
-    --secondary: 225 25% 12%;
-    --secondary-foreground: 210 40% 98%;
-    --muted: 217 18% 40%;
-    --muted-foreground: 214 20% 70%;
-    --ok: 150 62% 45%;
-    --danger: 0 84% 60%;
-    --border: 225 22% 18%;
-    --ring: 265 80% 56%;
+    /* Brand Primaries */
+    --disa-primary: 263 70% 58%;
+    --disa-primary-ink: 210 40% 98%;
+
+    /* Surfaces */
+    --disa-bg: 220 40% 3%;
+    --disa-bg-soft: 222 32% 8%;
+    --disa-surface: 217 33% 14%;
+    --disa-surface-2: 217 33% 18%;
+    --disa-border: 217 33% 24%;
+
+    /* Text */
+    --disa-ink: 210 40% 98%;
+    --disa-ink-dim: 215 18% 75%;
+
+    /* Semantic */
+    --disa-destructive: 0 83% 60%;
+    --disa-ok: 143 60% 45%;
+
+    /* Chat bubbles */
+    --disa-bubble-user: 257 84% 62%;
+    --disa-bubble-assistant: 230 16% 18%;
   }
 
   .light {
-    --background: 0 0% 100%;
-    --foreground: 222 47% 10%;
-    --card: 0 0% 100%;
-    --card-foreground: 222 47% 10%;
-    --primary: 265 80% 56%;
-    --primary-2: 295 75% 55%;
-    --accent: 190 90% 50%;
-    --secondary: 210 40% 96%;
-    --secondary-foreground: 222 47% 15%;
-    --muted: 215 18% 45%;
-    --muted-foreground: 215 16% 47%;
-    --ok: 150 62% 38%;
-    --danger: 0 84% 48%;
-    --border: 214 32% 91%;
-    --ring: 265 80% 56%;
+    --disa-bg: 0 0% 100%;
+    --disa-bg-soft: 0 0% 98%;
+    --disa-surface: 0 0% 96%;
+    --disa-surface-2: 0 0% 92%;
+    --disa-border: 214 32% 87%;
+    --disa-ink: 220 20% 10%;
+    --disa-ink-dim: 220 10% 40%;
+
+    --disa-bubble-user: 260 85% 62%;
+    --disa-bubble-assistant: 240 16% 96%;
   }
 
-  * { @apply border-border; }
+  :root {
+    /* Map -> Tailwind tokens */
+    --background: var(--disa-bg);
+    --foreground: var(--disa-ink);
+    --card: var(--disa-surface);
+    --card-foreground: var(--disa-ink);
+    --primary: var(--disa-primary);
+    --primary-foreground: var(--disa-primary-ink);
+    --secondary: var(--disa-surface-2);
+    --secondary-foreground: var(--disa-ink);
+    --muted: 217 18% 35%;
+    --muted-foreground: var(--disa-ink-dim);
+    --accent: var(--disa-primary);
+    --accent-foreground: var(--disa-primary-ink);
+    --destructive: var(--disa-destructive);
+    --destructive-foreground: 210 40% 98%;
+    --border: var(--disa-border);
+    --input: var(--disa-border);
+    --ring: var(--disa-primary);
+  }
+}
+
+/* ====== BASE ====== */
+@layer base {
+  * {
+    @apply border-border;
+  }
+
   body {
     @apply bg-background text-foreground;
     font-feature-settings: "rlig" 1, "calt" 1;
@@ -48,70 +77,93 @@
     -webkit-tap-highlight-color: transparent;
   }
 
+  /* Root height for mobile 100dvh layouts */
   html, body, #root { height: 100%; }
+
+  /* Momentum scrolling on iOS */
+  .-webkit-overflow-scrolling-touch { -webkit-overflow-scrolling: touch; }
 }
 
-/* ===== UTILITIES ===== */
+/* ====== UTILITIES / COMPONENT SKINS ====== */
 @layer utilities {
-  .text-gradient {
-    background: linear-gradient(135deg, hsl(var(--primary)), hsl(var(--primary-2)), hsl(var(--accent)));
-    -webkit-background-clip: text; background-clip: text; color: transparent;
+  .glass {
+    @apply bg-card/30 backdrop-blur-xl border border-white/10;
   }
-  .glass { @apply bg-card/50 backdrop-blur-xl border border-white/10; }
-  .glass-ink { @apply bg-secondary/60 backdrop-blur-xl border border-white/5; }
+  .glass-heavy {
+    @apply bg-card/50 backdrop-blur-2xl border border-white/20;
+  }
 
-  /* Squircle bubble + beak */
-  .bubble {
-    border-radius: 22px;
-    position: relative;
-    isolation: isolate;
+  .text-gradient {
+    @apply bg-gradient-to-r from-primary via-fuchsia-400 to-rose-400 bg-clip-text text-transparent;
+  }
+
+  .shadow-soft {
+    box-shadow: 0 4px 22px rgba(0,0,0,0.25);
+  }
+
+  /* Signature bubble shapes */
+  .bubble-shell {
+    @apply rounded-2xl px-4 py-3 leading-relaxed break-words;
   }
   .bubble-user {
-    color: white;
-    background: linear-gradient(135deg, hsl(var(--primary)) 0%, hsl(var(--primary-2)) 60%, hsl(var(--accent)) 100%);
-    box-shadow: 0 8px 24px rgba(139,92,246,.25);
+    @apply bubble-shell text-white;
+    background: linear-gradient(135deg, hsl(var(--disa-bubble-user)) 0%, hsl(var(--disa-bubble-user)/.85) 100%);
+    border-radius: 18px 18px 6px 18px; /* distinctive corner cut */
   }
   .bubble-assistant {
-    @apply glass-ink;
+    @apply bubble-shell border border-border/60 bg-secondary/60;
+    border-radius: 18px 18px 18px 6px;
   }
-  .bubble-user::after, .bubble-assistant::after {
-    content:""; position:absolute; bottom:6px; width:14px; height:14px; transform: rotate(45deg);
-  }
-  .bubble-user::after { right:-6px; background: inherit; filter: brightness(0.98); }
-  .bubble-assistant::after { left:-6px; background: hsl(var(--secondary)); opacity: .9; }
 
-  /* Comet loader */
-  .comet {
-    position: relative; width: 64px; height: 6px; border-radius: 9999px; background: hsl(var(--muted))/20;
+  /* Typing indicator bubble */
+  .typing-bubble {
+    @apply bubble-assistant flex items-center gap-1;
+  }
+  .typing-dot {
+    @apply w-2 h-2 rounded-full bg-muted-foreground;
+    animation: typing 1.4s infinite both;
+  }
+  .typing-dot:nth-child(2) { animation-delay: .15s; }
+  .typing-dot:nth-child(3) { animation-delay: .3s; }
+  @keyframes typing {
+    0%, 60%, 100% { transform: translateY(0); opacity: .5; }
+    30% { transform: translateY(-4px); opacity: 1; }
+  }
+
+  /* Send FAB (bigger touch-target, signature shape) */
+  .fab-send {
+    @apply h-12 w-12 md:h-12 md:w-12 rounded-2xl flex items-center justify-center text-white;
+    background: linear-gradient(135deg, hsl(var(--disa-primary)) 0%, hsl(var(--disa-primary)/.8) 100%);
+    box-shadow: 0 8px 22px hsl(var(--disa-primary)/.35);
+    transition: transform .12s ease, box-shadow .2s ease, filter .2s ease;
+  }
+  .fab-send:active { transform: translateY(1px) scale(.98); filter: brightness(.98); }
+
+  /* Ripple-ish press feedback (pure CSS) */
+  .ripple {
+    position: relative;
     overflow: hidden;
   }
-  .comet::before {
-    content:""; position:absolute; left:-20%; top:0; width:20%; height:100%;
-    background: linear-gradient(90deg, transparent, hsl(var(--primary)), hsl(var(--accent)));
-    animation: comet 1.1s linear infinite;
-  }
-  @keyframes comet { 0% { left:-30%; } 100% { left:110%; } }
-
-  /* Ripple tap */
-  .ripple { position: relative; overflow: hidden; }
   .ripple:after {
-    content:""; position:absolute; inset:0; background: radial-gradient( circle at var(--x) var(--y), rgba(255,255,255,.25), transparent 45% );
-    opacity: 0; transition: opacity .4s;
+    content: "";
+    position: absolute;
+    inset: 0;
+    background-image: radial-gradient(circle, rgba(255,255,255,.35) 10%, transparent 10.01%);
+    background-repeat: no-repeat;
+    background-position: 50%;
+    transform: scale(10);
+    opacity: 0;
+    transition: transform .5s, opacity .9s;
   }
-  .ripple:active:after { opacity: 1; transition: 0s; }
-
-  /* Code blocks */
-  pre.code {
-    @apply relative rounded-xl border border-border bg-secondary/60 p-3 text-sm overflow-x-auto;
-  }
-  .code-copy {
-    @apply absolute top-2 right-2 px-2 py-1 text-xs rounded-md bg-background/70 border border-border;
-  }
-
-  /* Scrollbars */
-  ::-webkit-scrollbar { width: 6px; height: 6px; }
-  ::-webkit-scrollbar-thumb { background: hsl(var(--muted))/40; border-radius: 8px; }
+  .ripple:active:after { transform: scale(0); opacity: .35; transition: 0s; }
 }
 
-/* iOS momentum */
-.-webkit-overflow-scrolling-touch { -webkit-overflow-scrolling: touch; }
+/* ====== SCROLLBAR ====== */
+::-webkit-scrollbar { width: 6px; height: 6px; }
+::-webkit-scrollbar-track { @apply bg-transparent; }
+::-webkit-scrollbar-thumb { @apply bg-muted/30 rounded-full; }
+::-webkit-scrollbar-thumb:hover { @apply bg-muted/50; }
+
+/* ====== GLOBAL ANIMS ====== */
+html { scroll-behavior: smooth; }
+*:focus-visible { @apply outline-none ring-2 ring-ring ring-offset-2 ring-offset-background; }

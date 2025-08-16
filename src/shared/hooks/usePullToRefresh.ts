@@ -1,14 +1,5 @@
 import { useEffect, useRef, useState, type RefObject } from "react";
-
-type Options = {
-  distance?: number;
-  maxPull?: number;
-};
-
-/**
- * Benutzung:
- * const { offset, active } = usePullToRefresh(listRef, async () => {...}, { distance: 80, maxPull: 120 })
- */
+type Options = { distance?: number; maxPull?: number };
 export function usePullToRefresh(
   elRef: RefObject<HTMLElement>,
   onRefresh: () => void | Promise<void>,
@@ -26,51 +17,31 @@ export function usePullToRefresh(
       const node = elRef.current;
       if (!node) return;
       if (node.scrollTop !== 0) return;
-
       const t0 = e.touches.item(0);
       if (!t0) return;
-
       startY.current = t0.clientY;
       setActive(true);
       setOffset(0);
     }
-
     function onMove(e: TouchEvent) {
       if (!active || startY.current == null) return;
-
       const t0 = e.touches.item(0);
       if (!t0) return;
-
       const dy = t0.clientY - startY.current;
-      if (dy <= 0) {
-        // Reset wenn nach oben gewischt
-        setActive(false);
-        startY.current = null;
-        setOffset(0);
-        return;
-      }
+      if (dy <= 0) { setActive(false); startY.current = null; setOffset(0); return; }
       setOffset(Math.min(dy, maxPull));
     }
-
     async function onEnd() {
       if (!active) return;
-      const shouldRefresh = offset >= distance;
-
-      // Reset
-      setActive(false);
-      startY.current = null;
-      setOffset(0);
-
-      if (shouldRefresh) {
-        await onRefresh();
-      }
+      const trigger = offset >= distance;
+      setActive(false); startY.current = null; setOffset(0);
+      if (trigger) await onRefresh();
     }
 
     el.addEventListener("touchstart", onStart, { passive: true });
     el.addEventListener("touchmove", onMove, { passive: true });
     el.addEventListener("touchend", onEnd);
     el.addEventListener("touchcancel", onEnd);
-
     return () => {
       el.removeEventListener("touchstart", onStart);
       el.removeEventListener("touchmove", onMove);

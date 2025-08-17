@@ -1,42 +1,27 @@
 import React, { useMemo, useState, useEffect } from "react";
 import { useSettings } from "../../entities/settings/store";
-import { PersonaContext, type PersonaModel } from "../../entities/persona";
+import { PersonaContext } from "../../entities/persona";
 import { useClient } from "../../lib/client";
 import type { OpenRouterModel } from "../../lib/openrouter";
 
-/** simples Glob-Matching für allow/deny */
-function matches(text: string, pattern: string): boolean {
-  const escaped = pattern.replace(/[.+^${}()|[\]\\]/g, "\\$&").replace(/\*/g, ".*").replace(/\?/g, ".");
-  return new RegExp(`^${escaped}$`, "i").test(text);
+/** Hilfsanzeige für Kontextlänge */
+function ctxLabel(m?: OpenRouterModel) {
+  const v = m?.context_length;
+  return typeof v === "number" && v > 0 ? ` · ctx ${v}` : "";
 }
-function isAllowed(modelId: string, allow?: string[], deny?: string[]): boolean {
-  if (allow && allow.length) return allow.some(p => matches(modelId, p));
-  if (deny && deny.length) return !deny.some(p => matches(modelId, p));
-  return true;
-}
-
-type Row = { m: PersonaModel; allowed: boolean; available: boolean; remote?: OpenRouterModel | null };
 
 export default function SettingsSheet({ open, onOpenChange }: { open: boolean; onOpenChange: (v: boolean) => void }) {
-  const { data } = React.useContext(PersonaContext);
+  const { data } = React.useContext(PersonaContext); // nur noch für Styles genutzt
   const s = useSettings();
-  const { client, apiKey, refreshModels, remoteIds, remoteLoaded } = useClient();
+  const { client, apiKey, refreshModels, remoteModels, remoteLoaded } = useClient();
   const [loading, setLoading] = useState(false);
 
-  useEffect(() => { if (open && apiKey && !remoteLoaded) setLoading(true); else setLoading(false); }, [open, apiKey, remoteLoaded]);
+  useEffect(() => { if (open && !remoteLoaded) setLoading(true); else setLoading(false); }, [open, remoteLoaded]);
 
-  const currentStyle = useMemo(
-    () => data.styles.find(st => st.id === s.personaId) ?? data.styles[0] ?? null,
-    [s.personaId, data.styles]
-  );
+  const styleCards = useMemo(() => data.styles, [data.styles]);
 
-  const rows: Row[] = useMemo(() => {
-    return data.models.map((m) => {
-      const allowed = isAllowed(m.id, currentStyle?.allow, currentStyle?.deny);
-      const available = remoteIds.size === 0 ? true : remoteIds.has(m.id);
-      return { m, allowed, available, remote: undefined };
-    });
-  }, [data.models, currentStyle, remoteIds]);
+  // Remote-Modelle sind die einzige Quelle für die Liste
+  const rows = useMemo(() => remoteModels, [remoteModels]);
 
   return (
     <div className={`fixed inset-0 z-40 ${open ? "" : "pointer-events-none"}`} aria-hidden={!open}>
@@ -51,15 +36,15 @@ export default function SettingsSheet({ open, onOpenChange }: { open: boolean; o
           <button
             className="text-xs px-2 py-1 rounded-lg border border-white/10 hover:bg-white/5"
             onClick={() => { setLoading(true); void refreshModels().finally(()=>setLoading(false)); }}
-            title="Modelle neu prüfen"
-          >{loading ? "aktualisiere…" : "Modelle neu prüfen"}</button>
+            title="Modelle neu laden"
+          >{loading ? "lädt…" : "Modelle neu laden"}</button>
         </div>
 
         <div className="space-y-6">
           <section>
             <div className="text-xs uppercase text-white/60 mb-2">Stil</div>
             <div className="grid grid-cols-2 gap-2">
-              {data.styles.map(st => (
+              {styleCards.map(st => (
                 <button
                   key={st.id}
                   className={`px-3 py-2 rounded-xl border text-left ${s.personaId === st.id ? "border-[#D97706] bg-[#D97706]/10" : "border-white/10 hover:bg-white/5"}`}
@@ -73,27 +58,34 @@ export default function SettingsSheet({ open, onOpenChange }: { open: boolean; o
           </section>
 
           <section>
-            <div className="text-xs uppercase text-white/60 mb-2">Modell {(!remoteLoaded && apiKey) && <span className="text-white/40">(prüfe Verfügbarkeit…)</span>}</div>
+            <div className="text-xs uppercase text-white/60 mb-2">
+              Modelle {(!remoteLoaded) && <span className="text-white/40">(lade Liste …)</span>}
+              {apiKey ? <span className="ml-2 text-white/40">(API-Key gesetzt)</span> : <span className="ml-2 text-white/40">(kein API-Key)</span>}
+            </div>
+
             <div className="space-y-2 max-h-[40vh] overflow-y-auto pr-1">
-              {rows.map(({ m, allowed, available }) => {
+              {rows.length === 0 && (
+                <div className="text-sm text-white/60 border border-white/10 rounded-xl px-3 py-2">
+                  Keine Modelle geladen. Prüfe Netzwerk oder klicke „Modelle neu laden“.
+                </div>
+              )}
+              {rows.map((m) => {
                 const active = s.modelId === m.id;
-                // **strict boolean** – kein ""/null in disabled schleusen
-                const disabled: boolean = !allowed || (!!apiKey && !available);
+                // Immer auswählbar – keine Deaktivierung
                 return (
                   <button
                     key={m.id}
-                    disabled={disabled}
-                    className={`w-full px-3 py-2 rounded-xl border text-left ${active ? "border-[#D97706] bg-[#D97706]/10" : "border-white/10 hover:bg-white/5"} ${disabled ? "opacity-50 cursor-not-allowed" : ""}`}
-                    onClick={() => !disabled && s.setModelId(m.id)}
-                    title={!allowed ? "Für den aktuellen Stil nicht erlaubt" : (apiKey ? (available ? "gelistet" : "nicht gelistet (dein Key)") : "Verfügbarkeit unbekannt (kein API-Key)")}
+                    className={`w-full px-3 py-2 rounded-xl border text-left ${active ? "border-[#D97706] bg-[#D97706]/10" : "border-white/10 hover:bg-white/5"}`}
+                    onClick={() => s.setModelId(m.id)}
+                    title={m.description || m.name || m.id}
                   >
                     <div className="flex items-center justify-between gap-2">
                       <div>
-                        <div className="text-sm font-medium">{m.label}</div>
-                        <div className="text-xs text-white/60">{m.id}{m.context ? ` · ctx ${m.context}` : ""}</div>
+                        <div className="text-sm font-medium">{m.name || m.id}</div>
+                        <div className="text-xs text-white/60">{m.id}{ctxLabel(m)}</div>
                       </div>
                       <div className="text-xs px-2 py-0.5 rounded-full border border-white/10">
-                        {!apiKey ? "unbekannt" : (available ? "gelistet" : "nicht gelistet")}
+                        aus API
                       </div>
                     </div>
                   </button>

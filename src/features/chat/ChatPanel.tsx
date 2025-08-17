@@ -21,7 +21,7 @@ export default function ChatPanel() {
   const openSettings = useContext(SettingsContext);
   const settings = useSettings();
   const persona = useContext(PersonaContext);
-  const { client, apiKey, remoteIds, remoteLoaded, getContextFor } = useClient();
+  const { client, apiKey, getContextFor } = useClient();
 
   // Laden/Speichern via IndexedDB (mit Fallback)
   useEffect(() => { (async () => setItems(await loadChat()))(); }, []);
@@ -38,31 +38,22 @@ export default function ChatPanel() {
 
   useEffect(() => { const el = listRef.current; if (el) el.scrollTop = el.scrollHeight + 9999; }, [items, busy]);
 
+  // Nur noch minimale Voraussetzungen prüfen
   const disabledReason = useMemo(() => {
     if (!apiKey) return "Kein API-Key gesetzt";
     if (!settings.modelId) return "Kein Modell gewählt";
-    if (remoteLoaded && remoteIds.size > 0 && !remoteIds.has(settings.modelId)) {
-      return "Gewähltes Modell ist bei OpenRouter nicht verfügbar";
-    }
     return "";
-  }, [apiKey, settings.modelId, remoteLoaded, remoteIds]);
+  }, [apiKey, settings.modelId]);
 
   function last200<T>(arr: T[]): T[] { return arr.length > 200 ? arr.slice(-200) : arr; }
   function pushSystem(msg: string) { setItems(prev => [...prev, { id: uuid(), role: "assistant", content: `❌ ${msg}`, ts: Date.now() }]); }
 
-  /** einfache Token-Schätzung (≈ 3.6 Zeichen pro Token) */
   function estimateTokens(text: string): number {
     return Math.ceil((text ?? "").length / 3.6);
   }
 
-  /**
-   * Kontext-Zusammenstellung:
-   * - Ziel: so viel Historie wie möglich, aber unterhalb der Kontextlänge
-   * - Reserve: 1024 Tokens für die Modell-Antwort
-   * - Wenn unbekannt: 8192 tokens annehmen
-   */
   function buildContext(history: ChatMessage[], userContent: string, modelId: string): ChatMessage[] {
-    const ctxTokens = Math.max(2048, getContextFor(modelId, 8192)); // großzügig
+    const ctxTokens = Math.max(2048, getContextFor(modelId, 8192));
     const reserveOut = 1024;
     const budget = Math.max(1024, ctxTokens - reserveOut);
 
@@ -71,7 +62,6 @@ export default function ChatPanel() {
 
     const tail: ChatMessage[] = [...history, { role: "user", content: userContent }];
 
-    // Von hinten auffüllen bis Budget erreicht (ohne Index-Zugriff → kein undefined)
     let used = estimateTokens(messages.map(m => m.content).join("\n"));
     const collected: ChatMessage[] = [];
     for (const tMsg of [...tail].reverse()) {
@@ -87,12 +77,8 @@ export default function ChatPanel() {
   async function send() {
     if (busy || !input.trim()) return;
 
-    if (apiKey && !remoteLoaded) {
-      pushSystem("Prüfe Modellverfügbarkeit … bitte kurz warten und erneut senden.");
-      return;
-    }
     if (disabledReason) {
-      pushSystem(disabledReason + " – wähle ein gelistetes Modell in den Einstellungen.");
+      pushSystem(disabledReason + " – bitte in den Einstellungen korrigieren.");
       openSettings();
       return;
     }
@@ -135,8 +121,7 @@ export default function ChatPanel() {
     const userMsg = items[idx - 1];
     if (!userMsg || userMsg.role !== "user") return;
 
-    if (apiKey && !remoteLoaded) { pushSystem("Prüfe Modellverfügbarkeit … kurz warten und erneut generieren."); return; }
-    if (disabledReason) { pushSystem(disabledReason + " – anderes Modell wählen."); openSettings(); return; }
+    if (disabledReason) { pushSystem(disabledReason + " – bitte anpassen."); openSettings(); return; }
 
     const controller = new AbortController();
     setBusy(true);
@@ -175,19 +160,6 @@ export default function ChatPanel() {
 
   return (
     <div className="chat-root">
-      {(apiKey && !remoteLoaded) && (
-        <div className="m-2 p-3 text-sm bg-white/5 text-white/80 border border-white/10 rounded-xl">
-          Prüfe Modellverfügbarkeit …
-        </div>
-      )}
-
-      {disabledReason && (
-        <div className="m-2 p-3 text-sm bg-yellow-500/10 text-yellow-200 border border-yellow-500/30 rounded-xl flex items-center justify-between">
-          <span>{disabledReason}</span>
-          <button className="btn btn--solid" onClick={openSettings}>Einstellungen</button>
-        </div>
-      )}
-
       <div ref={listRef} className="chat-list px-3 py-2 space-y-2 overflow-y-auto" style={{height: "calc(100dvh - 8rem)"}}>
         {renderItems.map(it => {
           const lbl = dayLabel(it.ts);
@@ -221,9 +193,9 @@ export default function ChatPanel() {
             value={input}
             onChange={(e)=>setInput(e.target.value)}
             onKeyDown={(e)=>{ if (e.key==="Enter" && !e.shiftKey){ e.preventDefault(); send(); } }}
-            disabled={busy || (!!apiKey && !remoteLoaded)}
+            disabled={busy}
           />
-          <button className="btn btn--solid" onClick={busy ? stop : send} disabled={(!!apiKey && !remoteLoaded) || (!busy && !input.trim())} aria-label={busy ? "Stop" : "Senden"}>
+          <button className="btn btn--solid" onClick={busy ? stop : send} disabled={!busy && !input.trim()} aria-label={busy ? "Stop" : "Senden"}>
             {busy ? "Stop" : "Senden"}
           </button>
         </div>

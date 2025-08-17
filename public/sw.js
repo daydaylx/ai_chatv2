@@ -1,5 +1,5 @@
 // App-Shell: cache-first; JSON: network-first (kein Stale persona.json)
-const APP_SHELL = "app-shell-v3";
+const APP_SHELL = "app-shell-v4"; // <- Version hochgesetzt, damit neue Bundles garantiert geladen werden
 const RUNTIME   = "runtime-v1";
 
 const SHELL_ASSETS = [ "/", "/index.html", "/manifest.webmanifest", "/icons/icon-192.png", "/icons/icon-512.png" ];

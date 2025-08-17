@@ -1,14 +1,13 @@
-import "./styles/tokens.css";
-import "./styles/app.css";
-import "./index.css";
-
 import React from "react";
-import { createRoot } from "react-dom/client";
+import ReactDOM from "react-dom/client";
 import App from "./App";
+import "./index.css";
 import { registerSW } from "./registerSW";
 
-const root = createRoot(document.getElementById("root")!);
-root.render(<React.StrictMode><App/></React.StrictMode>);
+registerSW(); // keine Argumente – Pfad ist in registerSW hart verdrahtet
 
-// PWA registrieren
-registerSW("/sw.js");
+ReactDOM.createRoot(document.getElementById("root")!).render(
+  <React.StrictMode>
+    <App />
+  </React.StrictMode>
+);

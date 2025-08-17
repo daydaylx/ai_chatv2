@@ -77,7 +77,8 @@ export default function SettingsSheet({ open, onOpenChange }: { open: boolean; o
             <div className="space-y-2 max-h-[40vh] overflow-y-auto pr-1">
               {rows.map(({ m, allowed, available }) => {
                 const active = s.modelId === m.id;
-                const disabled = !allowed || (apiKey && !available);
+                // **strict boolean** – kein ""/null in disabled schleusen
+                const disabled: boolean = !allowed || (!!apiKey && !available);
                 return (
                   <button
                     key={m.id}

@@ -27,8 +27,14 @@ export default function ChatPanel() {
   useEffect(() => { (async () => setItems(await loadChat()))(); }, []);
   useEffect(() => { void saveChat(items); }, [items]);
 
-  const style = useMemo(() => persona.data.styles.find(x => x.id === settings.personaId) ?? persona.data.styles[0] ?? null, [persona.data.styles, settings.personaId]);
-  const systemMsg = useMemo<ChatMessage | null>(() => style ? { role: "system", content: style.system } : null, [style]);
+  const style = useMemo(
+    () => persona.data.styles.find(x => x.id === settings.personaId) ?? persona.data.styles[0] ?? null,
+    [persona.data.styles, settings.personaId]
+  );
+  const systemMsg = useMemo<ChatMessage | null>(
+    () => style ? { role: "system", content: style.system } : null,
+    [style]
+  );
 
   useEffect(() => { const el = listRef.current; if (el) el.scrollTop = el.scrollHeight + 9999; }, [items, busy]);
 
@@ -44,10 +50,9 @@ export default function ChatPanel() {
   function last200<T>(arr: T[]): T[] { return arr.length > 200 ? arr.slice(-200) : arr; }
   function pushSystem(msg: string) { setItems(prev => [...prev, { id: uuid(), role: "assistant", content: `❌ ${msg}`, ts: Date.now() }]); }
 
-  /** einfache Token-Schätzung (≈ 4 Zeichen pro Token) */
+  /** einfache Token-Schätzung (≈ 3.6 Zeichen pro Token) */
   function estimateTokens(text: string): number {
-    // conservative: 3.6 Zeichen ≈ 1 Token
-    return Math.ceil(text.length / 3.6);
+    return Math.ceil((text ?? "").length / 3.6);
   }
 
   /**
@@ -64,15 +69,15 @@ export default function ChatPanel() {
     const messages: ChatMessage[] = [];
     if (systemMsg) messages.push(systemMsg);
 
-    const tail = [...history, { role: "user", content: userContent }];
+    const tail: ChatMessage[] = [...history, { role: "user", content: userContent }];
 
-    // Von hinten auffüllen bis Budget erreicht
+    // Von hinten auffüllen bis Budget erreicht (ohne Index-Zugriff → kein undefined)
     let used = estimateTokens(messages.map(m => m.content).join("\n"));
     const collected: ChatMessage[] = [];
-    for (let i = tail.length - 1; i >= 0; i--) {
-      const t = estimateTokens(tail[i].content);
+    for (const tMsg of [...tail].reverse()) {
+      const t = estimateTokens(tMsg.content);
       if (used + t > budget) break;
-      collected.push(tail[i]);
+      collected.push(tMsg);
       used += t;
     }
     collected.reverse();

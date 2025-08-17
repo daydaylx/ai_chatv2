@@ -4,11 +4,16 @@ export type PersonaModel = { id: string; label: string; tags?: string[]; context
 export type PersonaStyle = { id: string; name: string; system: string; hint?: string; allow?: string[]; deny?: string[] };
 export type PersonaData = { models: PersonaModel[]; styles: PersonaStyle[] };
 
-export type PersonaContextValue = {
+export type PersonaCtx = {
   data: PersonaData;
   warnings: string[];
   error: string | null;
   reload: () => void;
 };
 
-export const PersonaContext = createContext<PersonaContextValue | null>(null);
+export const PersonaContext = createContext<PersonaCtx>({
+  data: { models: [], styles: [] },
+  warnings: [],
+  error: null,
+  reload: () => {},
+});

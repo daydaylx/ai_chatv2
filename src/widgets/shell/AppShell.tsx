@@ -1,30 +1,31 @@
-import { ReactNode, useState, createContext } from "react";
+import React, { createContext, useState } from "react";
 import SettingsSheet from "../../features/settings/SettingsSheet";
-import { useSettings } from "../../entities/settings/store";
-import { Button } from "../../shared/ui/Button";
-
-type Props = { children: ReactNode };
 
 export const SettingsContext = createContext<() => void>(() => {});
 
-export function AppShell({ children }: Props) {
-  const [open, setOpen] = useState<boolean>(false);
-  const { modelId, personaId } = useSettings();
+export function AppShell({ children }: { children: React.ReactNode }) {
+  const [open, setOpen] = useState(false);
+  const openSettings = () => setOpen(true);
 
   return (
-    <SettingsContext.Provider value={() => setOpen(true)}>
-      <div className="m-app">
-        <header className="m-header">
-          <div className="m-header__title">AI Chat</div>
-          <div className="m-header__right">
-            <span className="badge">{modelId ?? "kein Modell"}</span>
-            <span className="badge badge--persona">{personaId ?? "Stil —"}</span>
-            <Button className="h-9 px-3" onClick={() => setOpen(true)}>Einstellungen</Button>
+    <SettingsContext.Provider value={openSettings}>
+      <div className="app-root bg-[#0b0b0b] text-white min-h-dvh">
+        <header className="sticky top-0 z-30 backdrop-blur-md bg-black/30 border-b border-white/10">
+          <div className="h-12 px-3 flex items-center justify-between">
+            <div className="text-sm font-semibold tracking-wide">
+              AI Chat
+              <span className="ml-2 text-xs px-2 py-0.5 rounded-full bg-[#D97706]/20 text-[#D97706]">mobil</span>
+            </div>
+            <div className="flex items-center gap-2">
+              <button className="btn btn--ghost" onClick={openSettings} aria-label="Einstellungen">⚙️</button>
+            </div>
           </div>
         </header>
-        <main className="m-main">{children}</main>
-        <SettingsSheet open={open} onClose={() => setOpen(false)} />
+        <main className="pb-20">{children}</main>
+        <SettingsSheet open={open} onOpenChange={setOpen} />
       </div>
     </SettingsContext.Provider>
   );
 }
+
+export default AppShell;

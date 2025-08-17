@@ -1,137 +1,108 @@
-import { useContext, useEffect, useMemo, useState } from "react";
+import React, { useMemo } from "react";
 import { useSettings } from "../../entities/settings/store";
-import { OpenRouterClient } from "../../lib/openrouter";
 import { PersonaContext } from "../../entities/persona";
 
-type Props = { open: boolean; onClose: () => void };
+/** simples Glob-Matching für allow/deny */
+function matches(text: string, pattern: string): boolean {
+  const escaped = pattern.replace(/[.+^${}()|[\]\\]/g, "\\$&").replace(/\*/g, ".*").replace(/\?/g, ".");
+  return new RegExp(`^${escaped}$`, "i").test(text);
+}
+function isAllowed(modelId: string, allow?: string[], deny?: string[]): boolean {
+  if (allow && allow.length) return allow.some(p => matches(modelId, p));
+  if (deny && deny.length) return !deny.some(p => matches(modelId, p));
+  return true;
+}
 
-export default function SettingsSheet({ open, onClose }: Props) {
-  const { modelId, setModelId, personaId, setPersonaId } = useSettings();
-  const client = useMemo(() => new OpenRouterClient(), []);
-  const [key, setKey] = useState<string>(() => client.getApiKey() ?? "");
-  const personaCtx = useContext(PersonaContext);
-  const personaData = personaCtx?.data;
+export default function SettingsSheet({ open, onOpenChange }: { open: boolean; onOpenChange: (v: boolean) => void }) {
+  const { data } = React.useContext(PersonaContext);
+  const s = useSettings();
 
-  const [tab, setTab] = useState<"models"|"styles"|"settings">("models");
-  const [loadingModels, setLoadingModels] = useState<boolean>(false);
-  const [modelError, setModelError] = useState<string | null>(null);
-  const [availableIds, setAvailableIds] = useState<Set<string>>(new Set());
-
-  function saveKey() { client.setApiKey((key || "").trim()); }
-  function clearKey() { client.clearApiKey(); setKey(""); }
-
-  useEffect(() => {
-    if (open && tab === "models" && availableIds.size === 0 && !loadingModels) {
-      setLoadingModels(true);
-      setModelError(null);
-      client.listModels().then(list => {
-        setAvailableIds(new Set(list.map(m => m.id)));
-      }).catch(e => {
-        setModelError(e?.message ?? String(e));
-      }).finally(() => {
-        setLoadingModels(false);
-      });
-    }
-  }, [open, tab]);
-
-  function globToRegExp(glob: string): RegExp {
-    const esc = glob.replace(/[.+^${}()|[\]\\]/g, "\\$&").replace(/\*/g, ".*").replace(/\?/g, ".");
-    return new RegExp("^" + esc + "$", "i");
-  }
-  function isModelAllowed(mid: string): boolean {
-    const style = personaData?.styles.find(s => s.id === personaId);
-    if (!style) return true;
-    const id = mid.trim();
-    if (!id) return false;
-    if (style.allow) return style.allow.some(g => globToRegExp(g).test(id));
-    if (style.deny) return !style.deny.some(g => globToRegExp(g).test(id));
-    return true;
-  }
+  const currentStyle = useMemo(() => data.styles.find(st => st.id === s.personaId) ?? data.styles[0] ?? null, [s.personaId, data.styles]);
+  const filteredModels = useMemo(() => {
+    if (!currentStyle) return data.models;
+    return data.models.map(m => ({ m, allowed: isAllowed(m.id, currentStyle.allow, currentStyle.deny) }));
+  }, [data.models, currentStyle]);
 
   return (
-    <div className={`sheet ${open ? "sheet--open" : ""}`} role="dialog" aria-modal="true" aria-label="Einstellungen">
-      <div className="sheet__panel">
-        <div className="sheet__header">
-          <div className="sheet__title">Einstellungen</div>
-          <button className="m-icon-btn" aria-label="Schließen" onClick={onClose}>
-            <svg width="22" height="22" viewBox="0 0 24 24" aria-hidden="true"><path d="M18 6 6 18M6 6l12 12" stroke="currentColor" strokeWidth="2" strokeLinecap="round"/></svg>
-          </button>
-        </div>
+    <div className={`fixed inset-0 z-40 ${open ? "" : "pointer-events-none"}`} aria-hidden={!open}>
+      <div
+        className={`absolute inset-0 bg-black/60 transition-opacity ${open ? "opacity-100" : "opacity-0"}`}
+        onClick={() => onOpenChange(false)}
+      />
+      <div className={`absolute bottom-0 left-0 right-0 bg-[#121212] rounded-t-2xl p-4 shadow-2xl transition-transform ${open ? "translate-y-0" : "translate-y-full"}`} role="dialog" aria-modal="true">
+        <div className="h-1 w-12 bg-white/20 rounded-full mx-auto mb-3" />
+        <div className="text-sm font-semibold mb-3">Einstellungen</div>
 
-        <div className="sheet__tabs">
-          <button onClick={() => setTab("models")} className={tab==="models"?"tab-active":""}>Modelle</button>
-          <button onClick={() => setTab("styles")} className={tab==="styles"?"tab-active":""}>Stile</button>
-          <button onClick={() => setTab("settings")} className={tab==="settings"?"tab-active":""}>Allgemein</button>
-        </div>
-
-        <div className="sheet__content">
-          {tab === "models" && (
-            <section className="block">
-              <h3 className="block__title">Modell</h3>
-              <div className="field">
-                <select className="input" value={modelId || ""} onChange={e => setModelId(e.target.value || null)}>
-                  <option value="">— Modell wählen —</option>
-                  {personaData?.models.map(m => {
-                    const allowed = isModelAllowed(m.id);
-                    const available = availableIds.size ? availableIds.has(m.id) : true;
-                    return (
-                      <option key={m.id} value={m.id} disabled={!allowed || !available}>
-                        {m.label}{!available ? " (nicht verfügbar)" : (!allowed ? " (inkompatibel)" : "")}
-                      </option>
-                    );
-                  })}
-                </select>
-                {loadingModels && <div className="hint">Lade verfügbare Modelle…</div>}
-                {modelError && <div className="hint">Fehler: {modelError}</div>}
-                {modelId && !isModelAllowed(modelId) && (
-                  <div className="hint">Aktuelles Modell ist mit dem gewählten Stil nicht kompatibel.</div>
-                )}
-              </div>
-            </section>
-          )}
-
-          {tab === "styles" && (
-            <section className="block">
-              <h3 className="block__title">Antwort-Stil</h3>
-              <ul style={{display:"grid", gap:"10px", listStyle:"none", padding:0, margin:0}}>
-                {personaData?.styles.map(style => (
-                  <li key={style.id} className={`preset ${style.id === personaId ? "preset--active" : ""}`} style={{border:"1px solid rgba(255,255,255,.18)", borderRadius:"12px", padding:"10px"}}>
-                    <label className="preset__row" style={{display:"flex", gap:"10px", alignItems:"start"}}>
-                      <input type="radio" name="preset" value={style.id} checked={style.id === personaId} onChange={() => setPersonaId(style.id || null)} />
-                      <div className="preset__body">
-                        <div className="preset__name" style={{fontWeight:700}}>{style.name}</div>
-                        <div className="preset__desc" style={{opacity:.8,fontSize:"14px"}}>{style.hint || ""}</div>
-                      </div>
-                    </label>
-                  </li>
-                ))}
-              </ul>
-            </section>
-          )}
-
-          {tab === "settings" && (
-            <section className="block">
-              <h3 className="block__title">API-Key</h3>
-              <div className="field">
-                <input type="password" className="input" placeholder="sk-..." value={key} onChange={e => setKey(e.target.value)} autoComplete="off" />
-                <div className="row" style={{ marginTop: "8px", display:"flex", gap:"8px" }}>
-                  <button className="btn" onClick={saveKey} disabled={!key.trim()}>Speichern</button>
-                  <button className="btn btn--ghost" onClick={clearKey}>Löschen</button>
-                </div>
-              </div>
-            </section>
-          )}
-
-          {personaCtx?.warnings.map((msg, idx) => (
-            <div key={idx} className="notice">{msg}</div>
-          ))}
-          {personaCtx?.error && (
-            <div className="notice">
-              {personaCtx.error} <button className="btn btn--ghost" onClick={personaCtx.reload}>Erneut versuchen</button>
+        <div className="space-y-6">
+          <section>
+            <div className="text-xs uppercase text-white/60 mb-2">Stil</div>
+            <div className="grid grid-cols-2 gap-2">
+              {data.styles.map(st => (
+                <button
+                  key={st.id}
+                  className={`px-3 py-2 rounded-xl border text-left ${s.personaId === st.id ? "border-[#D97706] bg-[#D97706]/10" : "border-white/10 hover:bg-white/5"}`}
+                  onClick={() => s.setPersonaId(st.id)}
+                >
+                  <div className="text-sm font-medium">{st.name}</div>
+                  {st.hint && <div className="text-xs text-white/60">{st.hint}</div>}
+                </button>
+              ))}
             </div>
-          )}
+          </section>
+
+          <section>
+            <div className="text-xs uppercase text-white/60 mb-2">Modell</div>
+            <div className="space-y-2 max-h-[40vh] overflow-y-auto pr-1">
+              {filteredModels.map(({ m, allowed }) => {
+                const active = s.modelId === m.id;
+                return (
+                  <button
+                    key={m.id}
+                    disabled={!allowed}
+                    className={`w-full px-3 py-2 rounded-xl border text-left ${active ? "border-[#D97706] bg-[#D97706]/10" : "border-white/10 hover:bg-white/5"} ${!allowed ? "opacity-50 cursor-not-allowed" : ""}`}
+                    onClick={() => allowed && s.setModelId(m.id)}
+                    title={!allowed ? "Für den aktuellen Stil nicht erlaubt" : ""}
+                  >
+                    <div className="text-sm font-medium">{m.label}</div>
+                    <div className="text-xs text-white/60">{m.id} {m.context ? `· ctx ${m.context}` : ""}</div>
+                  </button>
+                );
+              })}
+            </div>
+          </section>
+
+          <section>
+            <div className="text-xs uppercase text-white/60 mb-2">API-Key</div>
+            <ApiKeyField />
+          </section>
+
+          <div className="flex justify-end gap-2">
+            <button className="btn btn--ghost" onClick={() => onOpenChange(false)}>Schließen</button>
+          </div>
         </div>
       </div>
+    </div>
+  );
+}
+
+function ApiKeyField() {
+  const [val, setVal] = React.useState<string>("");
+  React.useEffect(() => {
+    try { setVal(localStorage.getItem("openrouter_api_key") ?? ""); } catch {}
+  }, []);
+  return (
+    <div className="flex items-center gap-2">
+      <input
+        type="password"
+        className="flex-1 bg-black/30 border border-white/10 rounded-xl px-3 py-2"
+        placeholder="sk-or-…"
+        value={val}
+        onChange={e => setVal(e.target.value)}
+      />
+      <button
+        className="btn btn--solid"
+        onClick={() => { try { localStorage.setItem("openrouter_api_key", val); } catch {} }}
+      >Speichern</button>
     </div>
   );
 }

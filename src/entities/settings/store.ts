@@ -16,48 +16,37 @@ function readLS(key: string): string | null {
     if (typeof window === "undefined" || !("localStorage" in window)) return null;
     const v = window.localStorage.getItem(key);
     return v && v.length ? v : null;
-  } catch {
-    return null;
-  }
+  } catch { return null; }
 }
-
 function writeLS(key: string, v: string | null) {
   try {
     if (typeof window === "undefined" || !("localStorage" in window)) return;
     if (v === null || v === "") window.localStorage.removeItem(key);
     else window.localStorage.setItem(key, v);
-  } catch {
-    /* ignore */
-  }
+  } catch {}
 }
 
-/**
- * Test-Erwartungen:
- * - Initial: modelId === null, personaId === "neutral" (sofern nichts in LS)
- * - Setter müssen denselben State-Ref mutieren (Tests halten 's' Referenz!)
- *   => Wir mutieren das Objekt aus get() und rufen set(state, true) (replace) auf.
- */
-const initialModel = readLS(KEY_MODEL);              // -> null erwartet
+// Tests erwarten: personaId default "neutral", modelId default null
+const initialModel = readLS(KEY_MODEL);
 const initialPersona = readLS(KEY_PERSONA) ?? "neutral";
 
 export const useSettings = create<SettingsState>((set, get) => ({
   modelId: initialModel ?? null,
   personaId: initialPersona,
 
+  // Setter mutieren dieselbe Objekt-Referenz (Tests halten s = getState())
   setModelId: (id) => {
     const state = get();
-    state.modelId = id ?? null;       // gleiche Objekt-Referenz mutieren
+    state.modelId = id ?? null;
     writeLS(KEY_MODEL, id ?? null);
-    set(state, true);                 // replace, aber gleiche Referenz beibehalten
+    set(state, true);
   },
-
   setPersonaId: (id) => {
     const state = get();
-    state.personaId = id ?? null;     // gleiche Objekt-Referenz mutieren
+    state.personaId = id ?? null;
     writeLS(KEY_PERSONA, id ?? null);
     set(state, true);
   },
-
   reset: () => {
     const state = get();
     state.modelId = null;

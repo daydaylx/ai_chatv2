@@ -1,6 +1,6 @@
 import React, { useMemo } from "react";
 import { useSettings } from "../../entities/settings/store";
-import { PersonaContext } from "../../entities/persona";
+import { PersonaContext, type PersonaModel } from "../../entities/persona";
 
 /** simples Glob-Matching für allow/deny */
 function matches(text: string, pattern: string): boolean {
@@ -13,14 +13,23 @@ function isAllowed(modelId: string, allow?: string[], deny?: string[]): boolean 
   return true;
 }
 
+type Row = { m: PersonaModel; allowed: boolean };
+
 export default function SettingsSheet({ open, onOpenChange }: { open: boolean; onOpenChange: (v: boolean) => void }) {
   const { data } = React.useContext(PersonaContext);
   const s = useSettings();
 
-  const currentStyle = useMemo(() => data.styles.find(st => st.id === s.personaId) ?? data.styles[0] ?? null, [s.personaId, data.styles]);
-  const filteredModels = useMemo(() => {
-    if (!currentStyle) return data.models;
-    return data.models.map(m => ({ m, allowed: isAllowed(m.id, currentStyle.allow, currentStyle.deny) }));
+  const currentStyle = useMemo(
+    () => data.styles.find(st => st.id === s.personaId) ?? data.styles[0] ?? null,
+    [s.personaId, data.styles]
+  );
+
+  // Immer konsistente Struktur zurückgeben (Row[])
+  const filteredModels: Row[] = useMemo(() => {
+    return data.models.map((m) => ({
+      m,
+      allowed: isAllowed(m.id, currentStyle?.allow, currentStyle?.deny)
+    }));
   }, [data.models, currentStyle]);
 
   return (

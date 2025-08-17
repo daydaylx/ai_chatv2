@@ -1,4 +1,4 @@
-cat << 'EOF' > public/persona.json
+
 {
   "models": [
     {
@@ -174,4 +174,4 @@ cat << 'EOF' > public/persona.json
     }
   ]
 }
-EOF
+

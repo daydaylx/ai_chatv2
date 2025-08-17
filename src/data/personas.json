@@ -63,4 +63,64 @@
     "allow": ["venice/*", "cognitivecomputations/*", "nothingiisreal/*", "sao10k/*", "liquid/*", "nvidia/*"]
   }
 ]
+  "models": [
+    { "id": "cognitivecomputations/dolphin-mistral-24b-venice-edition:free", "label": "Dolphin Mistral 24B Venice (free)", "tags": ["cognitivecomputations", "dolphin", "mistral", "free"] },
+    { "id": "deepseek/deepseek-r1:free", "label": "DeepSeek R1 (free)", "tags": ["deepseek", "r1", "free"] },
+    { "id": "cognitivecomputations/dolphin3.0-mistral-24b:free", "label": "Dolphin 3.0 Mistral 24B (free)", "tags": ["cognitivecomputations", "dolphin", "mistral", "free"] },
+    { "id": "qwen/qwen3-coder:free", "label": "Qwen3 Coder (free)", "tags": ["qwen", "coder", "free"] },
+    { "id": "meta-llama/llama-3.3-70b-instruct:free", "label": "Llama 3.3 70B Instruct (free)", "tags": ["meta-llama", "llama", "free"] },
 
+    { "id": "thedrummer/anubis-70b-v1.1", "label": "Anubis 70B v1.1", "tags": ["thedrummer", "anubis"] },
+    { "id": "nousresearch/hermes-3-llama-3.1-70b", "label": "Hermes 3 Llama 3.1 70B", "tags": ["nousresearch", "hermes", "llama"] },
+    { "id": "sao10k/l3.1-euryale-70b", "label": "L3.1 Euryale 70B", "tags": ["sao10k", "euryale"] },
+    { "id": "cognitivecomputations/dolphin-mixtral-8x22b", "label": "Dolphin Mixtral 8x22B", "tags": ["cognitivecomputations", "dolphin", "mixtral"] },
+    { "id": "thedrummer/rocinante-12b", "label": "Rocinante 12B", "tags": ["thedrummer", "rocinante"] },
+    { "id": "sao10k/l3.3-euryale-70b", "label": "L3.3 Euryale 70B", "tags": ["sao10k", "euryale"] },
+    { "id": "anthracite-org/magnum-v4-72b", "label": "Magnum v4 72B", "tags": ["anthracite-org", "magnum"] },
+    { "id": "neversleep/llama-3.1-lumimaid-70b", "label": "Llama 3.1 Lumimaid 70B", "tags": ["neversleep", "llama", "lumimaid"] },
+
+    { "id": "nothingiisreal/mn-celeste-12b", "label": "MN Celeste 12B", "tags": ["nothingiisreal", "celeste"] },
+    { "id": "thedrummer/unslopnemo-12b", "label": "UnslopNemo 12B", "tags": ["thedrummer", "unslopnemo"] },
+    { "id": "neversleep/llama-3.1-lumimaid-8b", "label": "Llama 3.1 Lumimaid 8B", "tags": ["neversleep", "llama", "lumimaid"] },
+    { "id": "mistralai/mixtral-8x22b-instruct", "label": "Mixtral 8x22B Instruct", "tags": ["mistralai", "mixtral"] }
+  ],
+
+  "modelGroups": [
+    {
+      "id": "free",
+      "name": "Kostenlose Modelle",
+      "include": [
+        "cognitivecomputations/dolphin-mistral-24b-venice-edition:free",
+        "deepseek/deepseek-r1:free",
+        "cognitivecomputations/dolphin3.0-mistral-24b:free",
+        "qwen/qwen3-coder:free",
+        "meta-llama/llama-3.3-70b-instruct:free"
+      ]
+    },
+    {
+      "id": "premium",
+      "name": "Premium Modelle",
+      "include": [
+        "thedrummer/anubis-70b-v1.1",
+        "nousresearch/hermes-3-llama-3.1-70b",
+        "sao10k/l3.1-euryale-70b",
+        "cognitivecomputations/dolphin-mixtral-8x22b",
+        "thedrummer/rocinante-12b",
+        "sao10k/l3.3-euryale-70b",
+        "anthracite-org/magnum-v4-72b",
+        "neversleep/llama-3.1-lumimaid-70b"
+      ]
+    },
+    {
+      "id": "community",
+      "name": "Community Favoriten",
+      "include": [
+        "nothingiisreal/mn-celeste-12b",
+        "thedrummer/unslopnemo-12b",
+        "neversleep/llama-3.1-lumimaid-8b",
+        "mistralai/mixtral-8x22b-instruct"
+      ]
+    }
+  ]
+}
+EOF

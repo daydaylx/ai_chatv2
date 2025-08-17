@@ -12,6 +12,20 @@ export interface ExtendedChatMessage extends ChatMessage {
   styleUsed?: string;
 }
 
+// Chat-Zusammenfassung für Liste
+export interface ChatSummary {
+  id: string;
+  title: string;
+  lastSnippet: string;
+}
+
+// Einzelne Nachricht im Chatverlauf
+export interface Message {
+  role: 'user' | 'assistant';
+  content: string;
+  ts: number;
+}
+
 // Persona Style Definition
 export interface PersonaStyle {
   id: string;
@@ -43,6 +57,19 @@ export interface AppState {
   chatHistory: ExtendedChatMessage[];
   isLoading: boolean;
   error: string | null;
+}
+
+// Modell-Info (z.B. für Einstellungen)
+export interface ModelInfo {
+  id: string;
+  label: string;
+  provider?: string;
+}
+
+// Stil-Template (z.B. für Einstellungen)
+export interface StyleTemplate {
+  id: string;
+  name: string;
 }
 
 // API Response Types

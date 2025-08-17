@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { loadPersonaData, type PersonaData, type PersonaStyle } from './api';
+import { loadPersonaData, getModelsForStyle, type PersonaData, type PersonaStyle } from './api';
 
 export default function App() {
   const [personaData, setPersonaData] = useState<PersonaData | null>(null);
@@ -12,20 +12,25 @@ export default function App() {
   useEffect(() => {
     loadPersonaData().then(data => {
       setPersonaData(data);
-      
+
       // Set default style
       const savedStyleId = localStorage.getItem('current_style_id');
-      const defaultStyle = savedStyleId 
+      const defaultStyle = savedStyleId
         ? data.styles.find(s => s.id === savedStyleId) || data.styles[0]
-        : data.styles;
-      
+        : data.styles[0];
       setCurrentStyle(defaultStyle || null);
-      
-      // Set default model
+
+      // Set default model (use saved or first allowed for the style)
       const savedModelId = localStorage.getItem('current_model_id');
-      const defaultModel = savedModelId || data.models?.id || '';
+      let defaultModel: string;
+      if (savedModelId && data.models.some(m => m.id === savedModelId)) {
+        defaultModel = savedModelId;
+      } else {
+        const allowedModels = defaultStyle ? getModelsForStyle(data.models, defaultStyle) : data.models;
+        defaultModel = allowedModels[0]?.id || '';
+      }
       setCurrentModel(defaultModel);
-      
+
       setLoading(false);
     });
   }, []);
@@ -63,6 +68,9 @@ export default function App() {
     );
   }
 
+  // Filter models based on current style (if any)
+  const modelsForStyle = currentStyle ? getModelsForStyle(personaData.models, currentStyle) : personaData.models;
+
   return (
     <div className="min-h-screen bg-gray-900 text-white">
       {/* Header */}
@@ -77,6 +85,11 @@ export default function App() {
               onChange={(e) => {
                 const style = personaData.styles.find(s => s.id === e.target.value);
                 setCurrentStyle(style || null);
+                // If current model is not allowed for new style, reset to first allowed
+                if (style && !getModelsForStyle(personaData.models, style).some(m => m.id === currentModel)) {
+                  const firstAllowed = getModelsForStyle(personaData.models, style)[0]?.id || '';
+                  setCurrentModel(firstAllowed);
+                }
               }}
               className="bg-gray-700 border border-gray-600 rounded px-3 py-1"
             >
@@ -93,7 +106,7 @@ export default function App() {
               onChange={(e) => setCurrentModel(e.target.value)}
               className="bg-gray-700 border border-gray-600 rounded px-3 py-1"
             >
-              {personaData.models.map(model => (
+              {modelsForStyle.map(model => (
                 <option key={model.id} value={model.id}>
                   {model.label}
                 </option>
@@ -114,7 +127,7 @@ export default function App() {
               <span className="ml-2 font-medium">{currentStyle?.name || 'Keiner'}</span>
             </div>
             <div>
-              <span className="text-gray-400">Model:</span>
+              <span className="text-gray-400">Modell:</span>
               <span className="ml-2 font-medium">
                 {personaData.models.find(m => m.id === currentModel)?.label || 'Keines'}
               </span>
@@ -143,9 +156,9 @@ export default function App() {
           />
           <p className="text-sm text-gray-400 mt-1">
             API Key wird lokal gespeichert. Hol dir einen kostenlosen Key von{' '}
-            <a href="https://openrouter.ai" target="_blank" rel="noopener" className="text-blue-400 hover:underline">
+            <a href="https://openrouter.ai" target="_blank" rel="noopener noreferrer" className="text-blue-400 hover:underline">
               openrouter.ai
-            </a>
+            </a>.
           </p>
         </div>
 
@@ -173,7 +186,7 @@ export default function App() {
           </div>
         </div>
 
-        {/* Chat Interface würde hier hin */}
+        {/* Chat Interface */}
         <div className="mt-8 bg-gray-800 rounded-lg p-4">
           <p className="text-gray-400 text-center">
             Chat-Interface wird hier integriert...

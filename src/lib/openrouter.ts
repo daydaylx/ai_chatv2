@@ -1,6 +1,11 @@
+/**
+ * OpenRouter Low-Level-Client mit:
+ * - robustem SSE-Parser (mehrzeilige Events, Heartbeats)
+ * - 429-Backoff (Retry-After respektiert, sonst Exponential Backoff)
+ * - deutscher Fehlertext-Aufbereitung
+ */
 export type ChatMessage = { role: "system" | "user" | "assistant"; content: string };
 
-/** Modell-Typ laut OpenRouter /models */
 export type OpenRouterModel = {
   id: string;
   name?: string;
@@ -11,13 +16,10 @@ export type OpenRouterModel = {
 };
 
 const KEY_STORAGE = "openrouter_api_key";
+const MODELS_CACHE_KEY = "openrouter_models_cache_v2";
 
-/**
- * Minimaler OpenRouter-Client:
- * - API-Key Verwaltung (localStorage + .env)
- * - Streaming Chat (SSE)
- * - Model-Liste (optional; leer bei Fehlern)
- */
+type ModelsCache = { ts: number; data: OpenRouterModel[] };
+
 export class OpenRouterClient {
   private apiKey: string | null;
 
@@ -33,12 +35,11 @@ export class OpenRouterClient {
 
   async listModels(): Promise<OpenRouterModel[]> {
     try {
-      const headers: Record<string, string> = { "Accept": "application/json" };
+      const headers: Record<string, string> = { "Accept": "application/json", "X-Title": "AI Chat PWA" };
       if (this.apiKey) headers["Authorization"] = `Bearer ${this.apiKey}`;
       const res = await fetch("https://openrouter.ai/api/v1/models", { headers });
       if (!res.ok) return [];
       const json = await res.json();
-      // API kann { data: [...] } oder { models: [...] } o.ä. liefern – robust extrahieren
       const list = Array.isArray(json?.data) ? json.data
                 : Array.isArray(json?.models) ? json.models
                 : Array.isArray(json) ? json
@@ -49,51 +50,143 @@ export class OpenRouterClient {
     }
   }
 
+  async listModelsCached(ttlMs = 5 * 60 * 1000): Promise<OpenRouterModel[]> {
+    try {
+      const raw = localStorage.getItem(MODELS_CACHE_KEY);
+      if (raw) {
+        const obj = JSON.parse(raw) as ModelsCache;
+        if (obj && Array.isArray(obj.data) && Date.now() - obj.ts < ttlMs) return obj.data;
+      }
+    } catch {}
+    const data = await this.listModels();
+    try { localStorage.setItem(MODELS_CACHE_KEY, JSON.stringify({ ts: Date.now(), data } as ModelsCache)); } catch {}
+    return data;
+  }
+
+  /**
+   * Streamt Chat-Antworten. Fällt auf Non-Streaming zurück, wenn kein SSE kommt.
+   * Backoff bei 429 (max 3 Versuche).
+   */
   async chatStream(
     body: any,
     signal: AbortSignal,
     onDelta: (chunk: string) => void
   ) {
-    const res = await fetch("https://openrouter.ai/api/v1/chat/completions", {
-      method: "POST",
-      headers: {
-        "Accept": "text/event-stream",
-        "Content-Type": "application/json",
-        "Authorization": `Bearer ${this.apiKey}`
-      },
-      body: JSON.stringify(body),
-      signal
-    });
+    const url = "https://openrouter.ai/api/v1/chat/completions"\;
+    const headers: Record<string,string> = {
+      "Accept": "text/event-stream",
+      "Content-Type": "application/json",
+      "Authorization": `Bearer ${this.apiKey}`,
+      "X-Title": "AI Chat PWA"
+    };
 
-    if (!res.ok) {
-      let msg = `OpenRouter Fehler ${res.status}`;
-      try { const data = await res.json(); msg = data?.error?.message || msg; } catch {}
-      throw new Error(msg);
-    }
+    let attempt = 0;
+    while (true) {
+      let res: Response;
+      try {
+        res = await fetch(url, { method: "POST", headers, body: JSON.stringify(body), signal });
+      } catch (e: any) {
+        if (e?.name === "AbortError") throw e;
+        // Netzwerkfehler -> 1 Retry
+        if (attempt++ < 1) { await sleep(1000); continue; }
+        throw new Error("Netzwerkfehler beim Aufruf der API.");
+      }
 
-    const reader = res.body!.getReader();
-    const decoder = new TextDecoder();
-    let buffer = "";
+      if (res.status === 429) {
+        // Rate-Limit: Retry-After respektieren, sonst Exponential
+        if (attempt++ >= 3) throw new Error("Rate-Limit erreicht (429). Bitte später erneut versuchen.");
+        const ra = parseRetryAfter(res.headers.get("Retry-After"));
+        await sleep(ra ?? (1500 * attempt));
+        continue;
+      }
 
-    for (;;) {
-      const { value, done } = await reader.read();
-      if (done) break;
-      buffer += decoder.decode(value, { stream: true });
-      let idx;
-      while ((idx = buffer.indexOf("\n")) !== -1) {
-        const line = buffer.slice(0, idx).trim();
-        buffer = buffer.slice(idx + 1);
-        if (!line) continue;
-        if (line.startsWith("data: ")) {
-          const data = line.slice(6);
-          if (data === "[DONE]") return;
-          try {
-            const obj = JSON.parse(data);
-            const delta = obj.choices?.[0]?.delta?.content;
-            if (delta) onDelta(delta);
-          } catch {}
+      if (!res.ok) {
+        // Fehlertext extrahieren und schöner machen
+        let msg = `OpenRouter Fehler ${res.status}`;
+        try { const data = await res.json(); msg = data?.error?.message || msg; } catch {}
+        throw new Error(mapErrorMessage(res.status, msg));
+      }
+
+      const ctype = (res.headers.get("Content-Type") || "").toLowerCase();
+      if (!ctype.includes("text/event-stream")) {
+        // Kein Stream -> JSON einmalig parsen
+        try {
+          const j = await res.json();
+          const text = j?.choices?.[0]?.message?.content || j?.choices?.[0]?.delta?.content || "";
+          if (text) onDelta(text);
+          return;
+        } catch {
+          throw new Error("Antwort konnte nicht geparst werden.");
         }
       }
+
+      // Robuster SSE-Parser (Events durch \n\n getrennt, mehrere data:-Zeilen)
+      const reader = res.body!.getReader();
+      const decoder = new TextDecoder();
+      let buf = "";
+
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+        buf += decoder.decode(value, { stream: true });
+
+        let sep;
+        while ((sep = buf.indexOf("\n\n")) !== -1) {
+          const eventChunk = buf.slice(0, sep);
+          buf = buf.slice(sep + 2);
+
+          // Jede Event-Zeile betrachten
+          const lines = eventChunk.split("\n").map(l => l.trim()).filter(Boolean);
+          if (!lines.length) continue;
+
+          // Mehrere data:-Zeilen zusammensetzen
+          const datas: string[] = [];
+          for (const line of lines) {
+            if (line.startsWith("data:")) datas.push(line.slice(5).trim());
+            // andere Felder (event:, id:) ignorieren
+          }
+          if (!datas.length) continue;
+
+          for (const d of datas) {
+            if (d === "[DONE]") return;
+            try {
+              const obj = JSON.parse(d);
+              // OpenRouter: choices[0].delta.content (stream) oder choices[0].message.content (final)
+              const delta = obj?.choices?.[0]?.delta?.content ?? obj?.choices?.[0]?.message?.content ?? "";
+              if (delta) onDelta(delta);
+            } catch {
+              // einzelne defekte Zeile ignorieren
+            }
+          }
+        }
+      }
+
+      return; // normaler Abschluss des Streams
     }
   }
+}
+
+/** Hilfsfunktionen */
+
+function sleep(ms: number) { return new Promise(r => setTimeout(r, ms)); }
+
+function parseRetryAfter(v: string | null): number | null {
+  if (!v) return null;
+  const s = Number(v);
+  if (!Number.isNaN(s)) return s * 1000;
+  const t = Date.parse(v);
+  if (!Number.isNaN(t)) return Math.max(0, t - Date.now());
+  return null;
+}
+
+function mapErrorMessage(status: number, raw: string): string {
+  const msg = raw || "";
+  if (status === 401) return "Nicht autorisiert. API-Key prüfen.";
+  if (status === 403) return /nsfw|policy/i.test(msg) ? "Inhalt vom Anbieter blockiert." : "Kein Zugriff auf dieses Modell / Plan.";
+  if (status === 404) return "Modell oder Endpoint nicht gefunden.";
+  if (status === 408) return "Zeitüberschreitung beim Anbieter.";
+  if (status === 409) return "Konflikt beim Anbieter. Bitte erneut senden.";
+  if (status === 422) return "Request unzulässig/zu groß (422).";
+  if (status >= 500) return "Anbieter-Fehler (5xx). Bitte später erneut versuchen.";
+  return msg;
 }

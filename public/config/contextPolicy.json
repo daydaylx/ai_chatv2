@@ -1,0 +1,15 @@
+{
+  "default": {
+    "summaryModelId": "qwen/qwen3-coder:free",
+    "reserveOutputRatio": 0.20,
+    "reserveOutputRatioReasoning": 0.33,
+    "summaryCapRatio": 0.15,
+    "rawTurns": 16,
+    "turnThreshold": 12,
+    "tokenThresholdRatio": 0.5
+  },
+  "overrides": {
+    "openai/o1*": { "reserveOutputRatio": 0.35, "rawTurns": 12 },
+    "deepseek/deepseek-r1*": { "reserveOutputRatio": 0.33, "rawTurns": 12 }
+  }
+}

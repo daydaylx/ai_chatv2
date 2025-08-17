@@ -1,0 +1,23 @@
+{
+  "models": [
+    { "id": "cognitivecomputations/dolphin-mistral-24b-venice-edition:free", "label": "Dolphin Mistral 24B Venice (free)", "tags": ["free","roleplay","mixtral"], "context": 65536 },
+    { "id": "deepseek/deepseek-r1:free", "label": "DeepSeek R1 (free)", "tags": ["free","reasoning"], "context": 163840 },
+    { "id": "cognitivecomputations/dolphin3.0-mistral-24b:free", "label": "Dolphin 3.0 Mistral 24B (free)", "tags": ["free","roleplay","mixtral"], "context": 65536 },
+    { "id": "qwen/qwen3-coder:free", "label": "Qwen3 Coder (free)", "tags": ["free","coding"], "context": 262144 },
+    { "id": "meta-llama/llama-3.3-70b-instruct:free", "label": "Llama 3.3 70B Instruct (free)", "tags": ["free","roleplay","llama"], "context": 65536 },
+
+    { "id": "thedrummer/anubis-70b-v1.1", "label": "Anubis 70B v1.1", "tags": ["premium","roleplay"], "context": 131072 },
+    { "id": "nousresearch/hermes-3-llama-3.1-70b", "label": "Hermes 3 Llama 3.1 70B", "tags": ["premium","roleplay","llama"], "context": 131072 },
+    { "id": "sao10k/l3.1-euryale-70b", "label": "L3.1 Euryale 70B", "tags": ["premium","roleplay"], "context": 131072 },
+    { "id": "cognitivecomputations/dolphin-mixtral-8x22b", "label": "Dolphin Mixtral 8x22B", "tags": ["premium","roleplay","mixtral"], "context": 262144 },
+    { "id": "thedrummer/rocinante-12b", "label": "Rocinante 12B", "tags": ["premium","roleplay"], "context": 65536 },
+    { "id": "sao10k/l3.3-euryale-70b", "label": "L3.3 Euryale 70B", "tags": ["premium","roleplay"], "context": 131072 },
+    { "id": "anthracite-org/magnum-v4-72b", "label": "Magnum v4 72B", "tags": ["premium","roleplay"], "context": 131072 },
+    { "id": "neversleep/llama-3.1-lumimaid-70b", "label": "Llama 3.1 Lumimaid 70B", "tags": ["premium","roleplay","llama"], "context": 131072 },
+
+    { "id": "nothingiisreal/mn-celeste-12b", "label": "MN Celeste 12B", "tags": ["community","roleplay"], "context": 65536 },
+    { "id": "thedrummer/unslopnemo-12b", "label": "UnslopNemo 12B", "tags": ["community","roleplay"], "context": 65536 },
+    { "id": "neversleep/llama-3.1-lumimaid-8b", "label": "Llama 3.1 Lumimaid 8B", "tags": ["community","roleplay","llama"], "context": 65536 },
+    { "id": "mistralai/mixtral-8x22b-instruct", "label": "Mixtral 8x22B Instruct", "tags": ["community","coding","mixtral"], "context": 262144 }
+  ]
+}

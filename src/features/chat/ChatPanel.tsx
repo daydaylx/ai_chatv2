@@ -1,203 +1,104 @@
-import React, { useContext, useEffect, useMemo, useRef, useState } from "react";
-import type { ChatMessage } from "../../lib/openrouter";
+import React, { useContext, useMemo, useRef, useState } from "react";
 import { useSettings } from "../../entities/settings/store";
+import { OpenRouterClient, type OpenRouterChatMessage } from "../../lib/openrouter";
+import { ensureSummary } from "../../lib/summary";
+import { buildPrompt } from "../../lib/context";
 import { PersonaContext } from "../../entities/persona";
-import { SettingsContext } from "../../widgets/shell/AppShell";
-import { useClient } from "../../lib/client";
-import { loadChat, saveChat } from "../../lib/db";
 
-type Bubble = ChatMessage & { id: string; ts: number };
-function uuid(): string { return (crypto as any)?.randomUUID?.() ?? `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`; }
+type Msg = { id: string; role: "user"|"assistant"|"system"; content: string; at: number };
+
+function uid() { return Math.random().toString(36).slice(2); }
 
 export default function ChatPanel() {
-  const [items, setItems] = useState<Bubble[]>([]);
+  const settings = useSettings() as any;
+  const { data } = useContext(PersonaContext);
+  const apiKey = settings?.apiKey || null;
+  const modelId = settings?.modelId || "deepseek/deepseek-r1:free";
+  const baseSystem = "Kurz, neutral.";
+  const activeStyle = useMemo(() => data.styles.find(st => st.id === (settings?.styleId || "neutral")) || { id: "neutral", name: "Sachlich", system: "Kurz, präzise, Deutsch." }, [data.styles, settings?.styleId]);
+  const styleSystem = activeStyle.system;
+
+  const [messages, setMessages] = useState<Msg[]>([]);
   const [input, setInput] = useState("");
-  const [busy, setBusy] = useState(false);
-  const [abortCtrl, setAbortCtrl] = useState<AbortController | null>(null);
+  const [streaming, setStreaming] = useState(false);
+  const abortRef = useRef<AbortController | null>(null);
 
-  const listRef = useRef<HTMLDivElement|null>(null);
-  const taRef = useRef<HTMLTextAreaElement|null>(null);
+  const client = useMemo(() => new OpenRouterClient(apiKey), [apiKey]);
+  const chatKey = "default";
 
-  const openSettings = useContext(SettingsContext);
-  const settings = useSettings();
-  const persona = useContext(PersonaContext);
-  const { client, apiKey, getContextFor } = useClient();
+  async function handleSend() {
+    const userText = input.trim();
+    if (!userText || streaming) return;
 
-  // Laden/Speichern via IndexedDB (mit Fallback)
-  useEffect(() => { (async () => setItems(await loadChat()))(); }, []);
-  useEffect(() => { void saveChat(items); }, [items]);
-
-  const style = useMemo(
-    () => persona.data.styles.find(x => x.id === settings.personaId) ?? persona.data.styles[0] ?? null,
-    [persona.data.styles, settings.personaId]
-  );
-  const systemMsg = useMemo<ChatMessage | null>(
-    () => style ? { role: "system", content: style.system } : null,
-    [style]
-  );
-
-  useEffect(() => { const el = listRef.current; if (el) el.scrollTop = el.scrollHeight + 9999; }, [items, busy]);
-
-  // Nur noch minimale Voraussetzungen prüfen
-  const disabledReason = useMemo(() => {
-    if (!apiKey) return "Kein API-Key gesetzt";
-    if (!settings.modelId) return "Kein Modell gewählt";
-    return "";
-  }, [apiKey, settings.modelId]);
-
-  function last200<T>(arr: T[]): T[] { return arr.length > 200 ? arr.slice(-200) : arr; }
-  function pushSystem(msg: string) { setItems(prev => [...prev, { id: uuid(), role: "assistant", content: `❌ ${msg}`, ts: Date.now() }]); }
-
-  function estimateTokens(text: string): number {
-    return Math.ceil((text ?? "").length / 3.6);
-  }
-
-  function buildContext(history: ChatMessage[], userContent: string, modelId: string): ChatMessage[] {
-    const ctxTokens = Math.max(2048, getContextFor(modelId, 8192));
-    const reserveOut = 1024;
-    const budget = Math.max(1024, ctxTokens - reserveOut);
-
-    const messages: ChatMessage[] = [];
-    if (systemMsg) messages.push(systemMsg);
-
-    const tail: ChatMessage[] = [...history, { role: "user", content: userContent }];
-
-    let used = estimateTokens(messages.map(m => m.content).join("\n"));
-    const collected: ChatMessage[] = [];
-    for (const tMsg of [...tail].reverse()) {
-      const t = estimateTokens(tMsg.content);
-      if (used + t > budget) break;
-      collected.push(tMsg);
-      used += t;
-    }
-    collected.reverse();
-    return messages.concat(collected);
-  }
-
-  async function send() {
-    if (busy || !input.trim()) return;
-
-    if (disabledReason) {
-      pushSystem(disabledReason + " – bitte in den Einstellungen korrigieren.");
-      openSettings();
-      return;
-    }
-
-    const userMsg: Bubble = { id: uuid(), role: "user", content: input.trim(), ts: Date.now() };
+    const userMsg: Msg = { id: uid(), role: "user", content: userText, at: Date.now() };
+    const next = [...messages, userMsg];
+    setMessages(next);
     setInput("");
-    setItems(prev => [...prev, userMsg]);
-    setBusy(true);
 
-    const controller = new AbortController();
-    setAbortCtrl(controller);
+    const fullHistory = next.map(m => ({ role: m.role, content: m.content })) as OpenRouterChatMessage[];
+    const userTurnCount = next.filter(m => m.role === "user").length;
+    const { summary } = await ensureSummary({ chatKey, modelId, fullHistory, userTurnCount });
+
+    const { messages: prompt } = await buildPrompt({ modelId, baseSystem, styleSystem, fullHistory, summary });
+
+    const assistantId = uid();
+    setMessages(m => [...m, { id: assistantId, role: "assistant", content: "", at: Date.now() }]);
+
+    const ac = new AbortController();
+    abortRef.current = ac;
+    setStreaming(true);
 
     try {
-      const historyMsgs = items.map(({ role, content }) => ({ role, content })) as ChatMessage[];
-      const messages = buildContext(historyMsgs, userMsg.content, settings.modelId!);
-
-      const reqBody = { model: settings.modelId!, messages, temperature: 0.7, max_tokens: 1024, stream: true };
-
-      const id = uuid();
-      setItems(prev => [...prev, { id, role: "assistant", content: "", ts: Date.now() }]);
-
-      await client.chatStream(reqBody, controller.signal, (delta) => {
-        setItems(prev => prev.map(b => b.id === id ? { ...b, content: b.content + delta } : b));
-      });
+      let acc = "";
+      for await (const delta of client.streamChat({ model: modelId, messages: prompt, signal: ac.signal })) {
+        acc += delta;
+        setMessages(m => m.map(x => x.id === assistantId ? { ...x, content: acc } : x));
+      }
     } catch (e: any) {
-      const msg = String(e?.message || e || "Fehler");
-      pushSystem(msg);
+      const msg =
+        e?.message === "NO_API_KEY" ? "Fehler: Kein API-Key gesetzt." :
+        e?.message === "AUTH" ? "Fehler: 401 – API-Key prüfen." :
+        e?.message === "RATE" ? "Rate-Limit – später erneut senden." :
+        e?.name === "AbortError" ? "Abgebrochen." : "Netzwerkfehler.";
+      setMessages(m => m.map(x => x.id === assistantId ? { ...x, content: `[${msg}]` } : x));
     } finally {
-      setBusy(false);
-      setAbortCtrl(null);
-      setTimeout(() => taRef.current?.focus(), 0);
+      setStreaming(false);
+      abortRef.current = null;
     }
   }
 
-  function stop() { abortCtrl?.abort(); }
-
-  async function regenerate(assistantId: string) {
-    const idx = items.findIndex(x => x.id === assistantId);
-    if (idx < 1 || idx !== items.length - 1) return;
-    const userMsg = items[idx - 1];
-    if (!userMsg || userMsg.role !== "user") return;
-
-    if (disabledReason) { pushSystem(disabledReason + " – bitte anpassen."); openSettings(); return; }
-
-    const controller = new AbortController();
-    setBusy(true);
-    setAbortCtrl(controller);
-    const newId = uuid();
-    setItems(prev => [...prev.slice(0, -1), { id: newId, role: "assistant", content: "", ts: Date.now() }]);
-
-    try {
-      const historyMsgs = items.slice(0, idx).map(({ role, content }) => ({ role, content })) as ChatMessage[];
-      const messages = buildContext(historyMsgs, userMsg.content, settings.modelId!);
-      const reqBody = { model: settings.modelId!, messages, temperature: 0.7, max_tokens: 1024, stream: true };
-
-      await client.chatStream(reqBody, controller.signal, (delta) => {
-        setItems(prev => prev.map(b => b.id === newId ? { ...b, content: b.content + delta } : b));
-      });
-    } catch (e: any) {
-      const msg = String(e?.message || e || "Fehler");
-      pushSystem(msg);
-    } finally {
-      setBusy(false);
-      setAbortCtrl(null);
-      setTimeout(() => taRef.current?.focus(), 0);
-    }
+  function handleStop() {
+    abortRef.current?.abort();
   }
-
-  function dayLabel(ts: number): string {
-    const d = new Date(ts); const t = new Date(); const y = new Date(); y.setDate(t.getDate()-1);
-    const iso = (x: Date) => x.toISOString().slice(0,10);
-    if (iso(d) === iso(t)) return "Heute";
-    if (iso(d) === iso(y)) return "Gestern";
-    return d.toLocaleDateString();
-  }
-
-  const daySeen = new Set<string>();
-  const renderItems = last200(items.filter(x => x.role !== "system"));
 
   return (
-    <div className="chat-root">
-      <div ref={listRef} className="chat-list px-3 py-2 space-y-2 overflow-y-auto" style={{height: "calc(100dvh - 8rem)"}}>
-        {renderItems.map(it => {
-          const lbl = dayLabel(it.ts);
-          const needDivider = !daySeen.has(lbl); if (needDivider) daySeen.add(lbl);
-          return (
-            <div key={it.id}>
-              {needDivider && <div className="my-3 text-center text-xs text-white/50">{lbl}</div>}
-              <div className={`max-w-[85%] ${it.role==="user" ? "ml-auto bg-[#D97706] text-black" : "mr-auto bg-white/5 text-white"} rounded-2xl px-3 py-2`}>
-                <div className="prose prose-invert whitespace-pre-wrap break-words">{it.content || (it.role==="assistant" && busy ? "…" : "")}</div>
-                {it.role === "assistant" && it.content && (
-                  <div className="mt-1 flex gap-1 text-xs text-white/60">
-                    <button className="m-icon-btn" onClick={() => navigator.clipboard?.writeText(it.content)} aria-label="Kopieren">Kopieren</button>
-                    <button className="m-icon-btn" onClick={() => ((navigator as any).share ? (navigator as any).share({ text: it.content }) : navigator.clipboard?.writeText(it.content))} aria-label="Teilen">Teilen</button>
-                    <button className="m-icon-btn" onClick={() => regenerate(it.id)} aria-label="Regenerieren">Regenerieren</button>
-                  </div>
-                )}
-              </div>
+    <div className="flex flex-col h-full">
+      <div className="flex-1 overflow-auto px-3 py-2 space-y-2">
+        {messages.map(m => (
+          <div key={m.id} className={m.role === "user" ? "text-right" : "text-left"}>
+            <div className={(m.role === "user" ? "bg-[var(--bubble-user)]" : "bg-[var(--bubble-ai)]") + " inline-block px-3 py-2 rounded-2xl whitespace-pre-wrap"}>
+              {m.content || (m.role === "assistant" ? "…" : null)}
             </div>
-          );
-        })}
-        {busy && <div className="mr-auto bg-white/5 text-white rounded-2xl px-3 py-2">…</div>}
+          </div>
+        ))}
       </div>
-
-      <div className="composer sticky bottom-0 inset-x-0 p-2 bg-black/40 backdrop-blur-md border-t border-white/10">
+      <div className="p-2 border-t border-white/10 bg-black/30 backdrop-blur-sm">
         <div className="flex gap-2">
           <textarea
-            ref={taRef}
+            className="flex-1 resize-none rounded-xl border border-white/10 bg-black/40 px-3 py-2 focus:outline-none focus:ring-2 focus:ring-[var(--ring)]"
             rows={1}
-            className="flex-1 resize-none bg-white/5 border border-white/10 rounded-xl px-3 py-2 outline-none focus:border-[#D97706]"
-            placeholder="Nachricht schreiben… (Enter=Send, Shift+Enter=Zeile)"
+            placeholder="Schreiben… (Enter=Send, Shift+Enter=Zeile)"
             value={input}
-            onChange={(e)=>setInput(e.target.value)}
-            onKeyDown={(e)=>{ if (e.key==="Enter" && !e.shiftKey){ e.preventDefault(); send(); } }}
-            disabled={busy}
+            onChange={e => setInput(e.target.value)}
+            onKeyDown={e => {
+              if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); void handleSend(); }
+            }}
           />
-          <button className="btn btn--solid" onClick={busy ? stop : send} disabled={!busy && !input.trim()} aria-label={busy ? "Stop" : "Senden"}>
-            {busy ? "Stop" : "Senden"}
-          </button>
+          {!streaming ? (
+            <button className="px-3 py-2 rounded-xl bg-[var(--accent)] text-black font-medium" onClick={() => void handleSend()}>Senden</button>
+          ) : (
+            <button className="px-3 py-2 rounded-xl bg-red-500 text-white font-medium" onClick={handleStop}>Stop</button>
+          )}
         </div>
       </div>
     </div>

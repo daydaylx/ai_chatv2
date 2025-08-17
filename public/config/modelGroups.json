@@ -1,0 +1,17 @@
+{
+  "modelGroups": [
+    { "id": "free", "name": "Kostenlos", "include": ["*:*free"] },
+    { "id": "premium", "name": "Premium", "include": ["*"], "exclude": ["*:*free"] },
+    {
+      "id": "community",
+      "name": "Community Favoriten",
+      "include": [
+        "nothingiisreal/*",
+        "thedrummer/unslopnemo-*",
+        "neversleep/llama-3.1-lumimaid-8b",
+        "mistralai/mixtral-8x22b-instruct"
+      ]
+    },
+    { "id": "roleplay", "name": "Roleplay", "tags": ["roleplay"] }
+  ]
+}

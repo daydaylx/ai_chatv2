@@ -1,60 +1,45 @@
 import { create } from "zustand";
+import { persist } from "zustand/middleware";
 
-export type SettingsState = {
-  modelId: string | null;
-  personaId: string | null;
+type SettingsState = {
+  apiKey: string | null;
+  modelId: string | null;         // aktive Modell-ID
+  styleId: string;                // aktiver Stil (id), Default "neutral"
+  accent: string;                 // HEX, z. B. #D97706
+  lang: string;                   // "de" | "en" ...
+  setApiKey: (k: string | null) => void;
   setModelId: (id: string | null) => void;
-  setPersonaId: (id: string | null) => void;
+  setStyleId: (id: string) => void;
+  setAccent: (hex: string) => void;
+  setLang: (code: string) => void;
   reset: () => void;
 };
 
-const KEY_MODEL = "settings:modelId";
-const KEY_PERSONA = "settings:personaId";
-
-function readLS(key: string): string | null {
-  try {
-    if (typeof window === "undefined" || !("localStorage" in window)) return null;
-    const v = window.localStorage.getItem(key);
-    return v && v.length ? v : null;
-  } catch { return null; }
-}
-function writeLS(key: string, v: string | null) {
-  try {
-    if (typeof window === "undefined" || !("localStorage" in window)) return;
-    if (v === null || v === "") window.localStorage.removeItem(key);
-    else window.localStorage.setItem(key, v);
-  } catch {}
-}
-
-// Tests erwarten: personaId default "neutral", modelId default null
-const initialModel = readLS(KEY_MODEL);
-const initialPersona = readLS(KEY_PERSONA) ?? "neutral";
-
-export const useSettings = create<SettingsState>((set, get) => ({
-  modelId: initialModel ?? null,
-  personaId: initialPersona,
-
-  // Setter mutieren dieselbe Objekt-Referenz (Tests halten s = getState())
-  setModelId: (id) => {
-    const state = get();
-    state.modelId = id ?? null;
-    writeLS(KEY_MODEL, id ?? null);
-    set(state, true);
-  },
-  setPersonaId: (id) => {
-    const state = get();
-    state.personaId = id ?? null;
-    writeLS(KEY_PERSONA, id ?? null);
-    set(state, true);
-  },
-  reset: () => {
-    const state = get();
-    state.modelId = null;
-    state.personaId = null;
-    writeLS(KEY_MODEL, null);
-    writeLS(KEY_PERSONA, null);
-    set(state, true);
-  },
-}));
-
-export default useSettings;
+export const useSettings = create<SettingsState>()(
+  persist(
+    (set, get) => ({
+      apiKey: null,
+      modelId: null,
+      styleId: "neutral",
+      accent: "#D97706",
+      lang: "de",
+      setApiKey: (k) => set({ apiKey: (k || "").trim() || null }),
+      setModelId: (id) => set({ modelId: id }),
+      setStyleId: (id) => set({ styleId: id || "neutral" }),
+      setAccent: (hex) => set({ accent: hex || "#D97706" }),
+      setLang: (code) => set({ lang: code || "de" }),
+      reset: () => set({ apiKey: null, modelId: null, styleId: "neutral", accent: "#D97706", lang: "de" })
+    }),
+    {
+      name: "ai_chat_settings_v1",
+      version: 1,
+      partialize: (s) => ({
+        apiKey: s.apiKey,
+        modelId: s.modelId,
+        styleId: s.styleId,
+        accent: s.accent,
+        lang: s.lang
+      })
+    }
+  )
+);

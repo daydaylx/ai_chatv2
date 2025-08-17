@@ -1,0 +1,17 @@
+{
+  "styles": [
+    {
+      "id": "neutral",
+      "name": "Sachlich",
+      "system": "Antworte knapp, präzise und auf Deutsch. Vermeide Floskeln.",
+      "hint": "Standard"
+    },
+    {
+      "id": "roleplay",
+      "name": "Rollen-Spiel",
+      "system": "Bleibe konsistent in der Rolle. Dialogorientiert, direkte Rede, klare Szenen. Sicherheitsregeln einhalten.",
+      "hint": "Dialoge",
+      "allow": ["*mixtral*","*llama*","cognitivecomputations/*","thedrummer/*","sao10k/*","neversleep/*","nothingiisreal/*"]
+    }
+  ]
+}

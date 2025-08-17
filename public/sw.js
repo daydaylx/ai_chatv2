@@ -1,58 +1,57 @@
-// App-Shell: cache-first; JSON: network-first; Update-Flow mit SKIP_WAITING
-const APP_SHELL = "app-shell-v5";
-const RUNTIME   = "runtime-v1";
-
-const SHELL_ASSETS = [ "/", "/index.html", "/manifest.webmanifest", "/icons/icon-192.png", "/icons/icon-512.png" ];
+const CACHE_NAME = "ai-chatv2-shell-v1";
+const APP_SHELL = ["/", "/index.html", "/manifest.webmanifest"];
 
 self.addEventListener("install", (event) => {
-  event.waitUntil(caches.open(APP_SHELL).then(c => c.addAll(SHELL_ASSETS)).then(()=>self.skipWaiting()));
+  event.waitUntil(
+    caches.open(CACHE_NAME).then((c) => c.addAll(APP_SHELL)).then(() => self.skipWaiting())
+  );
 });
 
 self.addEventListener("activate", (event) => {
-  event.waitUntil((async () => {
-    const keys = await caches.keys();
-    await Promise.all(keys.filter(k => k !== APP_SHELL && k !== RUNTIME).map(k => caches.delete(k)));
-    await self.clients.claim();
-  })());
+  event.waitUntil(
+    caches.keys().then(keys =>
+      Promise.all(keys.filter(k => k !== CACHE_NAME).map(k => caches.delete(k)))
+    ).then(() => self.clients.claim())
+  );
 });
+
+function isConfig(url) {
+  return url.pathname === "/persona.json" ||
+         url.pathname.startsWith("/config/") ||
+         url.pathname === "/models.json" ||
+         url.pathname === "/styles.json";
+}
 
 self.addEventListener("fetch", (event) => {
-  const req = event.request; const url = new URL(req.url);
-  if (url.origin !== location.origin) return;
+  const url = new URL(event.request.url);
 
-  if (req.mode === "navigate") {
+  // Nur GET cachen
+  if (event.request.method !== "GET") return;
+
+  // Konfigs: Stale-While-Revalidate
+  if (isConfig(url)) {
     event.respondWith((async () => {
-      try {
-        const fresh = await fetch(req);
-        const cache = await caches.open(APP_SHELL); cache.put("/", fresh.clone()).catch(()=>{});
-        return fresh;
-      } catch { return (await caches.match(req)) || (await caches.match("/index.html")); }
-    })()); return;
+      const cache = await caches.open(CACHE_NAME);
+      const cached = await cache.match(event.request);
+      const fetchPromise = fetch(event.request)
+        .then((res) => {
+          if (res && res.ok) cache.put(event.request, res.clone());
+          return res;
+        })
+        .catch(() => cached);
+      return cached || fetchPromise;
+    })());
+    return;
   }
 
-  if (url.pathname.endsWith(".json")) {
-    event.respondWith((async () => {
-      const cache = await caches.open(RUNTIME);
-      try {
-        const fresh = await fetch(new Request(req, { cache: "no-store" }));
-        cache.put(req, fresh.clone()).catch(()=>{});
-        return fresh;
-      } catch { return (await caches.match(req)) || new Response("{}", { status: 503, headers: { "Content-Type":"application/json" }}); }
-    })()); return;
+  // App-Shell: Cache-first
+  if (APP_SHELL.includes(url.pathname)) {
+    event.respondWith(
+      caches.match(event.request).then(res => res || fetch(event.request))
+    );
+    return;
   }
 
-  if (url.pathname.startsWith("/assets/") || url.pathname.startsWith("/icons/") || /\.(?:js|css|png|svg|webp)$/.test(url.pathname)) {
-    event.respondWith((async () => {
-      const cached = await caches.match(req); if (cached) return cached;
-      const res = await fetch(req); const cache = await caches.open(APP_SHELL); cache.put(req, res.clone()).catch(()=>{});
-      return res;
-    })()); return;
-  }
-});
-
-// Message-Handler für "SKIP_WAITING"
-self.addEventListener("message", (event) => {
-  if (event.data === "SKIP_WAITING") {
-    self.skipWaiting();
-  }
+  // Default: Netz
+  // (optional: weitere Caching-Strategien hier)
 });

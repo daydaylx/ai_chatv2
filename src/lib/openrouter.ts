@@ -87,13 +87,11 @@ export class OpenRouterClient {
         res = await fetch(url, { method: "POST", headers, body: JSON.stringify(body), signal });
       } catch (e: any) {
         if (e?.name === "AbortError") throw e;
-        // Netzwerkfehler -> 1 Retry
-        if (attempt++ < 1) { await sleep(1000); continue; }
+        if (attempt++ < 1) { await sleep(1000); continue; } // 1 Retry bei Netzwerkfehlern
         throw new Error("Netzwerkfehler beim Aufruf der API.");
       }
 
       if (res.status === 429) {
-        // Rate-Limit: Retry-After respektieren, sonst Exponential
         if (attempt++ >= 3) throw new Error("Rate-Limit erreicht (429). Bitte später erneut versuchen.");
         const ra = parseRetryAfter(res.headers.get("Retry-After"));
         await sleep(ra ?? (1500 * attempt));
@@ -101,7 +99,6 @@ export class OpenRouterClient {
       }
 
       if (!res.ok) {
-        // Fehlertext extrahieren und schöner machen
         let msg = `OpenRouter Fehler ${res.status}`;
         try { const data = await res.json(); msg = data?.error?.message || msg; } catch {}
         throw new Error(mapErrorMessage(res.status, msg));
@@ -135,15 +132,12 @@ export class OpenRouterClient {
           const eventChunk = buf.slice(0, sep);
           buf = buf.slice(sep + 2);
 
-          // Jede Event-Zeile betrachten
           const lines = eventChunk.split("\n").map(l => l.trim()).filter(Boolean);
           if (!lines.length) continue;
 
-          // Mehrere data:-Zeilen zusammensetzen
           const datas: string[] = [];
           for (const line of lines) {
             if (line.startsWith("data:")) datas.push(line.slice(5).trim());
-            // andere Felder (event:, id:) ignorieren
           }
           if (!datas.length) continue;
 
@@ -151,7 +145,6 @@ export class OpenRouterClient {
             if (d === "[DONE]") return;
             try {
               const obj = JSON.parse(d);
-              // OpenRouter: choices[0].delta.content (stream) oder choices[0].message.content (final)
               const delta = obj?.choices?.[0]?.delta?.content ?? obj?.choices?.[0]?.message?.content ?? "";
               if (delta) onDelta(delta);
             } catch {

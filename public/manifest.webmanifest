@@ -1,15 +1,15 @@
 {
-  "name": "AI Chat Mobile PWA",
+  "name": "AI Chat",
   "short_name": "AI Chat",
-  "description": "Private, mobile-first AI chat PWA.",
+  "description": "Privater, mobiler OpenRouter-Client",
   "start_url": "/",
   "scope": "/",
   "display": "standalone",
-  "background_color": "#0b0f19",
-  "theme_color": "#0b0f19",
+  "theme_color": "#0b0f14",
+  "background_color": "#0b0f14",
   "lang": "de",
   "icons": [
-    { "src": "/icons/icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any maskable" },
-    { "src": "/icons/icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any maskable" }
+    { "src": "/icons/icon-192.png", "sizes": "192x192", "type": "image/png" },
+    { "src": "/icons/icon-512.png", "sizes": "512x512", "type": "image/png" }
   ]
 }

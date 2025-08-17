@@ -1,104 +1,42 @@
-export type ChatMessage = { role: 'system' | 'user' | 'assistant'; content: string };
+export type ChatMessage = { role: "system" | "user" | "assistant"; content: string };
 
-export type OpenRouterModel = {
-  id: string;
-  name?: string;
-  context_length?: number;
-  input_price?: number;
-  output_price?: number;
-  pricing?: any;
-};
+export type OpenRouterModel = { id: string; name?: string };
 
-const BASE = 'https://openrouter.ai/api/v1';
-const LS_KEY = 'openrouter_api_key';
-
-function envKey(): string {
-  const anyEnv: any = (import.meta as any)?.env || {};
-  return String(anyEnv.VITE_OPENROUTER_API_KEY || '');
-}
-
-function authHeader(): string | null {
-  const key = localStorage.getItem(LS_KEY) || envKey();
-  return key ? `Bearer ${key}` : null;
-}
-
-async function ensureJson<T>(res: Response): Promise<T> {
-  const ct = res.headers.get('content-type') || '';
-  if (!ct.includes('application/json')) {
-    const text = await res.text().catch(() => '');
-    throw new Error(text || `Unerwartetes Response-Format (${ct})`);
-  }
-  return (await res.json()) as T;
-}
+const KEY_STORAGE = "openrouter_api_key";
 
 export class OpenRouterClient {
-  getApiKey(): string { return localStorage.getItem(LS_KEY) || envKey() || ''; }
-  setApiKey(key: string) { if (key) localStorage.setItem(LS_KEY, key); }
-  clearApiKey() { localStorage.removeItem(LS_KEY); }
+  private apiKey: string | null;
 
-  async listModels(): Promise<OpenRouterModel[]> {
-    const headers: Record<string,string> = { 'Accept':'application/json' };
-    const auth = authHeader();
-    if (auth) headers['Authorization'] = auth;
-
-    const res = await fetch(`${BASE}/models`, { headers });
-    if (!res.ok) {
-      let msg = `OpenRouter Fehler ${res.status}`;
-      try {
-        const j: any = await ensureJson<any>(res);
-        msg = j?.error?.message || msg;
-      } catch (e) {
-        void e; // JSON nicht parsebar – Standardfehlermeldung beibehalten
-      }
-      throw new Error(msg);
-    }
-
-    const data: any = await ensureJson<any>(res);
-    const list = data?.data ?? [];
-    return list.map((m: any) => {
-      const id = m.id ?? m.slug ?? '';
-      return {
-        id,
-        name: m.name ?? id,
-        context_length: m.context_length,
-        input_price: m.input_price,
-        output_price: m.output_price,
-        pricing: m.pricing
-      } as OpenRouterModel;
-    }).filter((m: OpenRouterModel) => !!m.id);
+  constructor() {
+    const fromEnv = (import.meta as any)?.env?.VITE_OPENROUTER_API_KEY || "";
+    const fromLS = (typeof localStorage !== "undefined") ? localStorage.getItem(KEY_STORAGE) : null;
+    this.apiKey = (fromLS && fromLS.trim()) ? fromLS : (fromEnv?.trim() ? fromEnv : null);
   }
 
-  async chat(opts: {
-    model: string;
-    messages: ChatMessage[];
-    temperature?: number;
-    max_tokens?: number;
-  }): Promise<{ content: string }> {
-    const headers: Record<string,string> = { 'Accept':'application/json', 'Content-Type':'application/json' };
-    const auth = authHeader();
-    if (auth) headers['Authorization'] = auth;
+  getApiKey(): string | null { return this.apiKey; }
 
-    const body = {
-      model: opts.model,
-      messages: opts.messages,
-      temperature: opts.temperature ?? 0.7,
-      max_tokens: opts.max_tokens ?? 1024
-    };
+  setApiKey(key: string) {
+    this.apiKey = key;
+    try { localStorage.setItem(KEY_STORAGE, key); } catch {}
+  }
 
-    const res = await fetch(`${BASE}/chat/completions`, { method:'POST', headers, body: JSON.stringify(body) });
+  clearApiKey() {
+    this.apiKey = null;
+    try { localStorage.removeItem(KEY_STORAGE); } catch {}
+  }
+
+  async listModels(): Promise<OpenRouterModel[]> {
+    if (!this.apiKey) throw new Error("Kein API-Key gesetzt.");
+    const res = await fetch("https://openrouter.ai/api/v1/models", {
+      headers: { "Authorization": `Bearer ${this.apiKey}` }
+    });
     if (!res.ok) {
-      let msg = `OpenRouter Fehler ${res.status}`;
-      try {
-        const j: any = await ensureJson<any>(res);
-        msg = j?.error?.message || msg;
-      } catch (e) {
-        void e; // JSON nicht parsebar – Standardfehlermeldung beibehalten
-      }
+      let msg = `Fehler ${res.status}`;
+      try { const data = await res.json(); msg = data?.error?.message || msg; } catch {}
       throw new Error(msg);
     }
-
-    const data: any = await ensureJson<any>(res);
-    const text = data?.choices?.[0]?.message?.content ?? '';
-    return { content: String(text) };
+    const data = await res.json();
+    const arr = Array.isArray(data?.data) ? data.data : [];
+    return arr.map((m: any) => ({ id: String(m.id || m.name || "").trim(), name: m.name }));
   }
 }

@@ -1,6 +1,11 @@
 export type ChatMessage = { role: "system" | "user" | "assistant"; content: string };
 
-export type OpenRouterModel = { id: string; name?: string };
+export type OpenRouterModel = {
+  id: string;
+  name?: string;
+  /** optional: vom API-Listing; in der UI rein informativ */
+  context_length?: number;
+};
 
 const KEY_STORAGE = "openrouter_api_key";
 
@@ -37,6 +42,10 @@ export class OpenRouterClient {
     }
     const data = await res.json();
     const arr = Array.isArray(data?.data) ? data.data : [];
-    return arr.map((m: any) => ({ id: String(m.id || m.name || "").trim(), name: m.name }));
+    return arr.map((m: any) => ({
+      id: String(m.id || m.name || "").trim(),
+      name: m.name,
+      context_length: typeof m?.context_length === "number" ? m.context_length : undefined
+    }));
   }
 }

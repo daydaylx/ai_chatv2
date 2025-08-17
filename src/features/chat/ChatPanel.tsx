@@ -12,7 +12,7 @@ function uuid(): string {
   return `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
 }
 
-// minimaler Markdown-Renderer (fenced code, links, strong/em)
+/** sehr einfacher Markdown-Renderer: fenced code, Links, strong/em */
 function renderMarkdown(text: string): JSX.Element {
   const parts: Array<{type: "code"|"text"; content: string}> = [];
   const fence = /```([\s\S]*?)```/g;
@@ -109,12 +109,10 @@ export default function ChatPanel({ client }: Props) {
     return "";
   }, [settings.modelId]);
 
-  // Persistenz (lokal)
   useEffect(() => {
     try { localStorage.setItem("chat_items", JSON.stringify(items)); } catch {}
   }, [items]);
 
-  // Auto-Scroll
   useEffect(() => {
     const el = listRef.current;
     if (!el) return;
@@ -130,7 +128,6 @@ export default function ChatPanel({ client }: Props) {
     const trimmed = input.trim();
     const userMsg: Bubble = { id: uuid(), role: "user", content: trimmed, ts: Date.now() };
 
-    // Snapshot der bisherigen History (ohne system), UI sofort updaten
     const historySnapshot = items;
     setInput("");
     setItems(prev => [...prev, userMsg]);
@@ -230,7 +227,7 @@ export default function ChatPanel({ client }: Props) {
     const idx = items.findIndex(x => x.id === assistantId);
     if (idx < 1 || idx !== items.length - 1) return; // nur letzte KI-Antwort
     const userMsg = items[idx - 1];
-    if (userMsg.role !== "user") return;
+    if (!userMsg || userMsg.role !== "user") return; // Guard gegen TS-Fehler
 
     const newId = uuid();
     const controller = new AbortController();
@@ -299,10 +296,8 @@ export default function ChatPanel({ client }: Props) {
     }
   }
 
-  // Anzeige: nur letzte 200 virtualisieren
   const renderItems = last200(items.filter(m => m.role !== "system"));
 
-  // Tages-Divider (Heute / Gestern / Datum)
   function dayLabel(ts: number): string {
     const d = new Date(ts); const today = new Date(); const yday = new Date(); yday.setDate(today.getDate()-1);
     const fmt = (x: Date) => x.toISOString().slice(0,10);
@@ -329,7 +324,7 @@ export default function ChatPanel({ client }: Props) {
       )}
 
       <div className="chat-list" ref={listRef} aria-live="polite" aria-label="Chat-Verlauf">
-        {renderItems.map((item, idx) => (
+        {renderItems.map((item) => (
           <div key={item.id}>
             {needDivider(item.ts) && <div className="day-divider"><span>{dayLabel(item.ts)}</span></div>}
             <div className={`bubble ${item.role === "user" ? "bubble--user" : "bubble--bot"}`}>
@@ -339,10 +334,10 @@ export default function ChatPanel({ client }: Props) {
               </div>
               {item.role === "assistant" && (
                 <div className="bubble__toolbar">
-                  <button className="m-icon-btn" onClick={() => copyToClipboard(item.content)} aria-label="Kopieren">
+                  <button className="m-icon-btn" onClick={() => navigator.clipboard?.writeText(item.content).catch(()=>{})} aria-label="Kopieren">
                     <svg width="20" height="20" viewBox="0 0 24 24" aria-hidden="true"><path d="M7 3H3v10h2V5h4V3zm4 2H5a2 2 0 0 0-2 2v8a2 2 0 0 0 2 2h6a2 2 0 0 0 2-2V7a2 2 0 0 0-2-2zm0 10H5V7h6v8z" fill="currentColor"/></svg>
                   </button>
-                  <button className="m-icon-btn" onClick={() => shareContent(item.content)} aria-label="Teilen">
+                  <button className="m-icon-btn" onClick={() => ((navigator as any).share ? (navigator as any).share({ text: item.content }).catch(()=>{}) : navigator.clipboard?.writeText(item.content))} aria-label="Teilen">
                     <svg width="20" height="20" viewBox="0 0 24 24" aria-hidden="true"><path d="M14 3h7v7h-2V6.414l-8.293 8.293-1.414-1.414L17.586 5H14V3z M5 5h5V3H5C3.9 3 3 3.9 3 5v12c0 1.1.9 2 2 2h12c1.1 0 2-.9 2-2v-5h-2v5H5V5z" fill="currentColor"/></svg>
                   </button>
                   <button className="m-icon-btn" onClick={() => regenerate(item.id)} aria-label="Regenerieren">

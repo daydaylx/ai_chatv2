@@ -1,28 +1,70 @@
-export type Role = "user" | "assistant" | "system";
-
-export interface Message {
-  id: string;
-  role: Role;
+// Basis Chat-Message Interface
+export interface ChatMessage {
+  role: 'system' | 'user' | 'assistant';
   content: string;
-  ts: number; // epoch ms
 }
 
-export interface ChatSummary {
+// Erweiterte Chat-Message mit Metadaten
+export interface ExtendedChatMessage extends ChatMessage {
   id: string;
-  title: string;
-  updatedAt: number;
-  lastSnippet: string;
+  timestamp: Date;
+  modelUsed?: string;
+  styleUsed?: string;
 }
 
-export interface ModelInfo {
-  id: string;
-  label: string;
-  provider?: string;
-  context?: number;
-}
-
-export interface StyleTemplate {
+// Persona Style Definition
+export interface PersonaStyle {
   id: string;
   name: string;
   system: string;
+  allow?: string[];
+  deny?: string[];
+}
+
+// Model Definition
+export interface PersonaModel {
+  id: string;
+  label: string;
+  tags?: string[];
+  context?: number;
+}
+
+// Komplette Persona-Daten
+export interface PersonaData {
+  models: PersonaModel[];
+  styles: PersonaStyle[];
+}
+
+// App State
+export interface AppState {
+  currentStyle: PersonaStyle | null;
+  currentModel: string;
+  apiKey: string;
+  chatHistory: ExtendedChatMessage[];
+  isLoading: boolean;
+  error: string | null;
+}
+
+// API Response Types
+export interface OpenRouterResponse {
+  choices: Array<{
+    message: {
+      role: string;
+      content: string;
+    };
+  }>;
+  usage?: {
+    prompt_tokens: number;
+    completion_tokens: number;
+    total_tokens: number;
+  };
+}
+
+// Error Types
+export interface APIError {
+  error: {
+    message: string;
+    type: string;
+    code?: string;
+  };
 }

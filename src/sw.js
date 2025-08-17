@@ -1,28 +1,54 @@
-import { clientsClaim } from "workbox-core";
-import { ExpirationPlugin } from "workbox-expiration";
-import { cleanupOutdatedCaches, precacheAndRoute, createHandlerBoundToURL } from "workbox-precaching";
-import { registerRoute, NavigationRoute } from "workbox-routing";
-import { StaleWhileRevalidate, NetworkOnly } from "workbox-strategies";
+import { precacheAndRoute, cleanupOutdatedCaches } from 'workbox-precaching';
+import { registerRoute } from 'workbox-routing';
+import { StaleWhileRevalidate, CacheFirst } from 'workbox-strategies';
 
-self.skipWaiting();
-clientsClaim();
+// Precache alle Build-Assets
+precacheAndRoute(self.__WB_MANIFEST);
 
-precacheAndRoute(self.__WB_MANIFEST || []);
+// Cleanup alter Caches
 cleanupOutdatedCaches();
 
-const handler = createHandlerBoundToURL("/index.html");
-registerRoute(new NavigationRoute(handler, {
-  allowlist: [/^\/$/, /\/index\.html/],
-  denylist: [/^\/api\//]
-}));
-
+// Cache Strategy für Persona-Daten
 registerRoute(
-  ({ request }) => ["style", "script", "image", "font"].includes(request.destination),
+  ({ url }) => url.pathname.endsWith('/persona.json'),
   new StaleWhileRevalidate({
-    cacheName: "assets-v1",
-    plugins: [new ExpirationPlugin({ maxEntries: 200, purgeOnQuotaError: true })]
+    cacheName: 'persona-data',
+    plugins: [{
+      cacheKeyWillBeUsed: async ({ request }) => {
+        return `${request.url}?v=${Date.now()}`;
+      }
+    }]
   })
 );
 
-registerRoute(({ url }) => url.origin === "https://openrouter.ai", new NetworkOnly(), "GET");
-registerRoute(({ url }) => url.origin === "https://openrouter.ai", new NetworkOnly(), "POST");
+// Cache Strategy für API-Requests
+registerRoute(
+  ({ url }) => url.origin === 'https://openrouter.ai',
+  new StaleWhileRevalidate({
+    cacheName: 'openrouter-api',
+    plugins: [{
+      cacheWillUpdate: async ({ response }) => {
+        return response.status === 200 ? response : null;
+      }
+    }]
+  })
+);
+
+// Cache Strategy für statische Assets
+registerRoute(
+  ({ request }) => ['style', 'script', 'worker'].includes(request.destination),
+  new CacheFirst({
+    cacheName: 'static-assets',
+  })
+);
+
+// Skip waiting und Clients claimen
+self.addEventListener('message', (event) => {
+  if (event.data && event.data.type === 'SKIP_WAITING') {
+    self.skipWaiting();
+  }
+});
+
+self.addEventListener('activate', () => {
+  self.clients.claim();
+});

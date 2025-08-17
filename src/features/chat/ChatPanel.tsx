@@ -1,23 +1,19 @@
 import React, { useContext, useEffect, useMemo, useRef, useState } from "react";
-import { OpenRouterClient, type ChatMessage } from "../../lib/openrouter";
+import type { ChatMessage } from "../../lib/openrouter";
 import { useSettings } from "../../entities/settings/store";
 import { PersonaContext } from "../../entities/persona";
 import { SettingsContext } from "../../widgets/shell/AppShell";
+import { useClient } from "../../lib/client";
+import { loadChat, saveChat } from "../../lib/db";
 
 type Bubble = ChatMessage & { id: string; ts: number };
 function uuid(): string { return (crypto as any)?.randomUUID?.() ?? `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`; }
 
-const BUILD_TAG = "chatpanel-guard-v2";
-
-export default function ChatPanel({ client }: { client: OpenRouterClient }) {
-  const [items, setItems] = useState<Bubble[]>(() => { try { return JSON.parse(localStorage.getItem("chat_items")||"[]"); } catch { return []; }});
+export default function ChatPanel() {
+  const [items, setItems] = useState<Bubble[]>([]);
   const [input, setInput] = useState("");
   const [busy, setBusy] = useState(false);
   const [abortCtrl, setAbortCtrl] = useState<AbortController | null>(null);
-
-  // Verfügbare Provider-Modelle
-  const [remoteIds, setRemoteIds] = useState<Set<string>>(new Set());
-  const [remoteLoaded, setRemoteLoaded] = useState(false);
 
   const listRef = useRef<HTMLDivElement|null>(null);
   const taRef = useRef<HTMLTextAreaElement|null>(null);
@@ -25,57 +21,71 @@ export default function ChatPanel({ client }: { client: OpenRouterClient }) {
   const openSettings = useContext(SettingsContext);
   const settings = useSettings();
   const persona = useContext(PersonaContext);
+  const { client, apiKey, remoteIds, remoteLoaded, getContextFor } = useClient();
 
-  // aktuellen Stil herausziehen
+  // Laden/Speichern via IndexedDB (mit Fallback)
+  useEffect(() => { (async () => setItems(await loadChat()))(); }, []);
+  useEffect(() => { void saveChat(items); }, [items]);
+
   const style = useMemo(() => persona.data.styles.find(x => x.id === settings.personaId) ?? persona.data.styles[0] ?? null, [persona.data.styles, settings.personaId]);
   const systemMsg = useMemo<ChatMessage | null>(() => style ? { role: "system", content: style.system } : null, [style]);
 
-  useEffect(() => { try { localStorage.setItem("chat_items", JSON.stringify(items)); } catch {} }, [items]);
   useEffect(() => { const el = listRef.current; if (el) el.scrollTop = el.scrollHeight + 9999; }, [items, busy]);
 
-  // Liste verfügbarer Modelle vom Provider cachen (5 Minuten)
-  useEffect(() => {
-    let alive = true;
-    (async () => {
-      try {
-        const list = await client.listModelsCached(5 * 60 * 1000);
-        if (!alive) return;
-        setRemoteIds(new Set(list.map(m => m.id)));
-      } finally {
-        if (alive) setRemoteLoaded(true);
-      }
-    })();
-    return () => { alive = false; };
-  }, [client]);
-
-  const apiKeySet = !!client.getApiKey();
-
-  // Gründe, warum Senden deaktiviert ist
   const disabledReason = useMemo(() => {
-    if (!apiKeySet) return "Kein API-Key gesetzt";
+    if (!apiKey) return "Kein API-Key gesetzt";
     if (!settings.modelId) return "Kein Modell gewählt";
-    // Wenn Liste da und nicht leer, Modell muss gelistet sein
     if (remoteLoaded && remoteIds.size > 0 && !remoteIds.has(settings.modelId)) {
-      return `Gewähltes Modell ist bei OpenRouter nicht verfügbar`;
+      return "Gewähltes Modell ist bei OpenRouter nicht verfügbar";
     }
     return "";
-  }, [apiKeySet, settings.modelId, remoteLoaded, remoteIds]);
+  }, [apiKey, settings.modelId, remoteLoaded, remoteIds]);
 
   function last200<T>(arr: T[]): T[] { return arr.length > 200 ? arr.slice(-200) : arr; }
+  function pushSystem(msg: string) { setItems(prev => [...prev, { id: uuid(), role: "assistant", content: `❌ ${msg}`, ts: Date.now() }]); }
 
-  function pushSystem(msg: string) {
-    setItems(prev => [...prev, { id: uuid(), role: "assistant", content: `❌ ${msg}`, ts: Date.now() }]);
+  /** einfache Token-Schätzung (≈ 4 Zeichen pro Token) */
+  function estimateTokens(text: string): number {
+    // conservative: 3.6 Zeichen ≈ 1 Token
+    return Math.ceil(text.length / 3.6);
+  }
+
+  /**
+   * Kontext-Zusammenstellung:
+   * - Ziel: so viel Historie wie möglich, aber unterhalb der Kontextlänge
+   * - Reserve: 1024 Tokens für die Modell-Antwort
+   * - Wenn unbekannt: 8192 tokens annehmen
+   */
+  function buildContext(history: ChatMessage[], userContent: string, modelId: string): ChatMessage[] {
+    const ctxTokens = Math.max(2048, getContextFor(modelId, 8192)); // großzügig
+    const reserveOut = 1024;
+    const budget = Math.max(1024, ctxTokens - reserveOut);
+
+    const messages: ChatMessage[] = [];
+    if (systemMsg) messages.push(systemMsg);
+
+    const tail = [...history, { role: "user", content: userContent }];
+
+    // Von hinten auffüllen bis Budget erreicht
+    let used = estimateTokens(messages.map(m => m.content).join("\n"));
+    const collected: ChatMessage[] = [];
+    for (let i = tail.length - 1; i >= 0; i--) {
+      const t = estimateTokens(tail[i].content);
+      if (used + t > budget) break;
+      collected.push(tail[i]);
+      used += t;
+    }
+    collected.reverse();
+    return messages.concat(collected);
   }
 
   async function send() {
     if (busy || !input.trim()) return;
 
-    // NEU: Wenn Key vorhanden, aber Modellsicht noch nicht geladen → erst gar nicht versuchen.
-    if (apiKeySet && !remoteLoaded) {
+    if (apiKey && !remoteLoaded) {
       pushSystem("Prüfe Modellverfügbarkeit … bitte kurz warten und erneut senden.");
       return;
     }
-
     if (disabledReason) {
       pushSystem(disabledReason + " – wähle ein gelistetes Modell in den Einstellungen.");
       openSettings();
@@ -92,9 +102,10 @@ export default function ChatPanel({ client }: { client: OpenRouterClient }) {
 
     try {
       const historyMsgs = items.map(({ role, content }) => ({ role, content })) as ChatMessage[];
-      const messages: ChatMessage[] = systemMsg ? [systemMsg, ...historyMsgs, { role: "user", content: userMsg.content }] : [...historyMsgs, { role: "user", content: userMsg.content }];
+      const messages = buildContext(historyMsgs, userMsg.content, settings.modelId!);
 
       const reqBody = { model: settings.modelId!, messages, temperature: 0.7, max_tokens: 1024, stream: true };
+
       const id = uuid();
       setItems(prev => [...prev, { id, role: "assistant", content: "", ts: Date.now() }]);
 
@@ -103,12 +114,7 @@ export default function ChatPanel({ client }: { client: OpenRouterClient }) {
       });
     } catch (e: any) {
       const msg = String(e?.message || e || "Fehler");
-      if (/No endpoints found for/i.test(msg)) {
-        pushSystem("Modell nicht verfügbar beim Anbieter. Bitte ein anderes Modell wählen.");
-        openSettings();
-      } else {
-        pushSystem(msg);
-      }
+      pushSystem(msg);
     } finally {
       setBusy(false);
       setAbortCtrl(null);
@@ -124,15 +130,8 @@ export default function ChatPanel({ client }: { client: OpenRouterClient }) {
     const userMsg = items[idx - 1];
     if (!userMsg || userMsg.role !== "user") return;
 
-    if (apiKeySet && !remoteLoaded) {
-      pushSystem("Prüfe Modellverfügbarkeit … bitte kurz warten und dann erneut generieren.");
-      return;
-    }
-    if (disabledReason) {
-      pushSystem(disabledReason + " – wähle ein gelistetes Modell in den Einstellungen.");
-      openSettings();
-      return;
-    }
+    if (apiKey && !remoteLoaded) { pushSystem("Prüfe Modellverfügbarkeit … kurz warten und erneut generieren."); return; }
+    if (disabledReason) { pushSystem(disabledReason + " – anderes Modell wählen."); openSettings(); return; }
 
     const controller = new AbortController();
     setBusy(true);
@@ -142,7 +141,7 @@ export default function ChatPanel({ client }: { client: OpenRouterClient }) {
 
     try {
       const historyMsgs = items.slice(0, idx).map(({ role, content }) => ({ role, content })) as ChatMessage[];
-      const messages: ChatMessage[] = systemMsg ? [systemMsg, ...historyMsgs] : historyMsgs;
+      const messages = buildContext(historyMsgs, userMsg.content, settings.modelId!);
       const reqBody = { model: settings.modelId!, messages, temperature: 0.7, max_tokens: 1024, stream: true };
 
       await client.chatStream(reqBody, controller.signal, (delta) => {
@@ -150,12 +149,7 @@ export default function ChatPanel({ client }: { client: OpenRouterClient }) {
       });
     } catch (e: any) {
       const msg = String(e?.message || e || "Fehler");
-      if (/No endpoints found for/i.test(msg)) {
-        pushSystem("Modell nicht verfügbar beim Anbieter. Bitte ein anderes Modell wählen.");
-        openSettings();
-      } else {
-        pushSystem(msg);
-      }
+      pushSystem(msg);
     } finally {
       setBusy(false);
       setAbortCtrl(null);
@@ -176,10 +170,7 @@ export default function ChatPanel({ client }: { client: OpenRouterClient }) {
 
   return (
     <div className="chat-root">
-      {/* Build-Tag in der Konsole hilft, SW-Stale zu erkennen */}
-      {useEffect(() => { try { console.debug(BUILD_TAG); } catch {} }, []) as unknown as null}
-
-      {(apiKeySet && !remoteLoaded) && (
+      {(apiKey && !remoteLoaded) && (
         <div className="m-2 p-3 text-sm bg-white/5 text-white/80 border border-white/10 rounded-xl">
           Prüfe Modellverfügbarkeit …
         </div>
@@ -225,9 +216,9 @@ export default function ChatPanel({ client }: { client: OpenRouterClient }) {
             value={input}
             onChange={(e)=>setInput(e.target.value)}
             onKeyDown={(e)=>{ if (e.key==="Enter" && !e.shiftKey){ e.preventDefault(); send(); } }}
-            disabled={busy || (apiKeySet && !remoteLoaded)}
+            disabled={busy || (!!apiKey && !remoteLoaded)}
           />
-          <button className="btn btn--solid" onClick={busy ? stop : send} disabled={(apiKeySet && !remoteLoaded) || (!busy && !input.trim())} aria-label={busy ? "Stop" : "Senden"}>
+          <button className="btn btn--solid" onClick={busy ? stop : send} disabled={(!!apiKey && !remoteLoaded) || (!busy && !input.trim())} aria-label={busy ? "Stop" : "Senden"}>
             {busy ? "Stop" : "Senden"}
           </button>
         </div>

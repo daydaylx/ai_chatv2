@@ -1,5 +1,5 @@
-// App-Shell: cache-first; JSON: network-first (kein Stale persona.json)
-const APP_SHELL = "app-shell-v4"; // <- Version hochgesetzt, damit neue Bundles garantiert geladen werden
+// App-Shell: cache-first; JSON: network-first; Update-Flow mit SKIP_WAITING
+const APP_SHELL = "app-shell-v5";
 const RUNTIME   = "runtime-v1";
 
 const SHELL_ASSETS = [ "/", "/index.html", "/manifest.webmanifest", "/icons/icon-192.png", "/icons/icon-512.png" ];
@@ -7,6 +7,7 @@ const SHELL_ASSETS = [ "/", "/index.html", "/manifest.webmanifest", "/icons/icon
 self.addEventListener("install", (event) => {
   event.waitUntil(caches.open(APP_SHELL).then(c => c.addAll(SHELL_ASSETS)).then(()=>self.skipWaiting()));
 });
+
 self.addEventListener("activate", (event) => {
   event.waitUntil((async () => {
     const keys = await caches.keys();
@@ -14,6 +15,7 @@ self.addEventListener("activate", (event) => {
     await self.clients.claim();
   })());
 });
+
 self.addEventListener("fetch", (event) => {
   const req = event.request; const url = new URL(req.url);
   if (url.origin !== location.origin) return;
@@ -45,5 +47,12 @@ self.addEventListener("fetch", (event) => {
       const res = await fetch(req); const cache = await caches.open(APP_SHELL); cache.put(req, res.clone()).catch(()=>{});
       return res;
     })()); return;
+  }
+});
+
+// Message-Handler für "SKIP_WAITING"
+self.addEventListener("message", (event) => {
+  if (event.data === "SKIP_WAITING") {
+    self.skipWaiting();
   }
 });

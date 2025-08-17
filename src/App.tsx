@@ -1,11 +1,10 @@
 import React, { useEffect, useMemo, useState } from "react";
 import ChatPanel from "./features/chat/ChatPanel";
 import { AppShell } from "./widgets/shell/AppShell";
-import { OpenRouterClient } from "./lib/openrouter";
 import { PersonaContext, PersonaData, PersonaStyle, PersonaModel } from "./entities/persona";
+import { ClientProvider } from "./lib/client";
 
 export default function App() {
-  const client = useMemo(() => new OpenRouterClient(), []);
   const [persona, setPersona] = useState<PersonaData>({ models: [], styles: [] });
   const [warnings, setWarnings] = useState<string[]>([]);
   const [error, setError] = useState<string | null>(null);
@@ -87,9 +86,11 @@ export default function App() {
 
   return (
     <PersonaContext.Provider value={{ data: persona, warnings, error, reload: loadPersona }}>
-      <AppShell>
-        <ChatPanel client={client} />
-      </AppShell>
+      <ClientProvider>
+        <AppShell>
+          <ChatPanel />
+        </AppShell>
+      </ClientProvider>
     </PersonaContext.Provider>
   );
 }

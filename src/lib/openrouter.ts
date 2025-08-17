@@ -72,7 +72,7 @@ export class OpenRouterClient {
     signal: AbortSignal,
     onDelta: (chunk: string) => void
   ) {
-    const url = "https://openrouter.ai/api/v1/chat/completions"\;
+    const url = "https://openrouter.ai/api/v1/chat/completions";
     const headers: Record<string,string> = {
       "Accept": "text/event-stream",
       "Content-Type": "application/json",

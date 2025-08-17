@@ -1,6 +1,7 @@
 /**
  * Registriert den Service Worker und meldet "Update verfügbar".
  * AppShell lauscht auf window-Event 'sw:update'.
+ * Keine Argumente erforderlich; Pfad ist hier festgelegt.
  */
 export function registerSW() {
   if (!("serviceWorker" in navigator)) return;
@@ -26,11 +27,13 @@ export function registerSW() {
       navigator.serviceWorker.addEventListener("controllerchange", () => {
         window.location.reload();
       });
-    }).catch(() => {});
+    }).catch(() => {
+      // stillschweigend ignorieren – offline/dev
+    });
   });
 }
 
-// Utility um den SW zu aktivieren
+// Utility um den SW sofort zu aktivieren (wird von AppShell aufgerufen)
 export function applySWUpdate(reg: ServiceWorkerRegistration) {
   reg.waiting?.postMessage?.("SKIP_WAITING");
 }

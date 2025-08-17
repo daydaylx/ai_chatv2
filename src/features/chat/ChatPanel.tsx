@@ -12,6 +12,7 @@ export default function ChatPanel({ client }: { client: OpenRouterClient }) {
   const [input, setInput] = useState("");
   const [busy, setBusy] = useState(false);
   const [abortCtrl, setAbortCtrl] = useState<AbortController | null>(null);
+  const [available, setAvailable] = useState<Set<string>>(new Set()); // OpenRouter /models
   const listRef = useRef<HTMLDivElement|null>(null);
   const taRef = useRef<HTMLTextAreaElement|null>(null);
 
@@ -21,21 +22,53 @@ export default function ChatPanel({ client }: { client: OpenRouterClient }) {
   const style = useMemo(() => persona.data.styles.find(x => x.id === settings.personaId) ?? persona.data.styles[0] ?? null, [persona.data.styles, settings.personaId]);
   const systemMsg = useMemo<ChatMessage | null>(() => style ? { role: "system", content: style.system } : null, [style]);
 
+  // Persist Chat
   useEffect(() => { try { localStorage.setItem("chat_items", JSON.stringify(items)); } catch {} }, [items]);
+  // Autoscroll
   useEffect(() => { const el = listRef.current; if (el) el.scrollTop = el.scrollHeight + 9999; }, [items, busy]);
 
+  // Verfügbarkeit der Modelle einmalig laden (nur wenn API-Key gesetzt)
+  useEffect(() => {
+    let alive = true;
+    (async () => {
+      const key = client.getApiKey();
+      if (!key) { setAvailable(new Set()); return; }
+      try {
+        const list = await client.listModels();
+        if (!alive) return;
+        setAvailable(new Set(list.map(m => m.id)));
+      } catch {
+        if (!alive) return;
+        setAvailable(new Set());
+      }
+    })();
+    return () => { alive = false; };
+  }, [client]);
+
+  // Gründe, warum Senden deaktiviert ist
   const disabledReason = useMemo(() => {
     const apiKey = client.getApiKey();
     if (!apiKey) return "Kein API-Key gesetzt";
     if (!settings.modelId) return "Kein Modell gewählt";
+    // Wenn wir eine Remote-Liste haben, blocken wir unbekannte Modelle
+    if (available.size > 0 && !available.has(settings.modelId)) {
+      return `Modell nicht verfügbar: ${settings.modelId}`;
+    }
     return "";
-  }, [settings.modelId, client]);
+  }, [settings.modelId, client, available]);
 
   function last200<T>(arr: T[]): T[] { return arr.length > 200 ? arr.slice(-200) : arr; }
 
   async function send() {
     if (busy || !input.trim()) return;
-    if (disabledReason) { openSettings(); return; }
+
+    // Harte Guards vor dem Request
+    if (disabledReason) {
+      // System-Bubble statt OpenRouter-Fehler
+      setItems(prev => [...prev, { id: uuid(), role: "assistant", content: `❌ ${disabledReason}. Öffne Einstellungen und wähle ein gelistetes Modell.`, ts: Date.now() }]);
+      openSettings();
+      return;
+    }
 
     const userMsg: Bubble = { id: uuid(), role: "user", content: input.trim(), ts: Date.now() };
     setInput("");
@@ -57,7 +90,9 @@ export default function ChatPanel({ client }: { client: OpenRouterClient }) {
         setItems(prev => prev.map(b => b.id === id ? { ...b, content: b.content + delta } : b));
       });
     } catch (e: any) {
-      if (e?.name !== "AbortError") setItems(prev => [...prev, { id: uuid(), role: "assistant", content: `❌ ${e?.message ?? e}`, ts: Date.now() }]);
+      if (e?.name !== "AbortError") {
+        setItems(prev => [...prev, { id: uuid(), role: "assistant", content: `❌ ${e?.message ?? e}`, ts: Date.now() }]);
+      }
     } finally {
       setBusy(false);
       setAbortCtrl(null);
@@ -118,10 +153,11 @@ export default function ChatPanel({ client }: { client: OpenRouterClient }) {
 
       <div ref={listRef} className="chat-list px-3 py-2 space-y-2 overflow-y-auto" style={{height: "calc(100dvh - 8rem)"}}>
         {renderItems.map(it => {
-          const needDivider = !daySeen.has(dayLabel(it.ts)); if (needDivider) daySeen.add(dayLabel(it.ts));
+          const lbl = dayLabel(it.ts);
+          const needDivider = !daySeen.has(lbl); if (needDivider) daySeen.add(lbl);
           return (
             <div key={it.id}>
-              {needDivider && <div className="my-3 text-center text-xs text-white/50">{dayLabel(it.ts)}</div>}
+              {needDivider && <div className="my-3 text-center text-xs text-white/50">{lbl}</div>}
               <div className={`max-w-[85%] ${it.role==="user" ? "ml-auto bg-[#D97706] text-black" : "mr-auto bg-white/5 text-white"} rounded-2xl px-3 py-2`}>
                 <div className="prose prose-invert whitespace-pre-wrap break-words">{it.content || (it.role==="assistant" && busy ? "…" : "")}</div>
                 {it.role === "assistant" && it.content && (

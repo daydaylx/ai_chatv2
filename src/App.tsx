@@ -58,13 +58,18 @@ export default function App() {
     const models: PersonaModel[] = [];
     const styles: PersonaStyle[] = [];
 
+    // WICHTIG: OpenRouter-IDs sind "anbieter/modell" → mindestens EIN Slash zulassen.
+    // Erlaubte Zeichen je Segment: [a-z0-9._-] (case-insensitive)
+    const MODEL_ID_RE = /^[a-z0-9._-]+(?:\/[a-z0-9._-]+)+$/i;
+    const STYLE_ID_RE = /^[a-z0-9][a-z0-9._-]{1,63}$/i;
+
     if (Array.isArray(input.models)) {
       const seenM = new Set<string>();
       for (let i = 0; i < input.models.length; i++) {
         const m = input.models[i] ?? {};
         const id = typeof m.id === "string" ? m.id.trim() : "";
         const label = typeof m.label === "string" ? m.label.trim() : "";
-        if (!id || !/^[a-z0-9][a-z0-9._-]{1,63}$/i.test(id)) { warnings.push(`Modell ${i}: ungültige id`); continue; }
+        if (!id || !MODEL_ID_RE.test(id)) { warnings.push(`Modell ${i}: ungültige id "${id}"`); continue; }
         if (seenM.has(id)) { warnings.push(`Modell ${i}: doppelte id "${id}"`); continue; }
         if (!label || label.length > 64) { warnings.push(`Modell ${i}: ungültiges Label`); continue; }
         seenM.add(id);
@@ -87,7 +92,7 @@ export default function App() {
         const deny = Array.isArray(s.deny) ? s.deny.filter((x: any) => typeof x === "string") : undefined;
 
         const errs: string[] = [];
-        if (!id || !/^[a-z0-9][a-z0-9._-]{1,63}$/i.test(id)) errs.push("ungültige id");
+        if (!id || !STYLE_ID_RE.test(id)) errs.push("ungültige id");
         if (seenS.has(id)) errs.push("doppelte id");
         if (name.length < 1 || name.length > 64) errs.push("Name Länge ungültig");
         if (system.length < 1 || system.length > 4000) errs.push("Systemprompt Länge ungültig");

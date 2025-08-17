@@ -1,53 +1,84 @@
-// App-Shell Caching (Navigation-Fallback), statische Assets, kein API-Caching
-const CACHE_NAME = "app-shell-v1";
-const STATIC_ASSETS = ["/", "/index.html", "/manifest.webmanifest"];
+// PWA Service Worker – App-Shell cache-first, JSON network-first
+// Version bump => Clients bekommen frische Assets & Logik
+const APP_SHELL = "app-shell-v2";
+const RUNTIME   = "runtime-v1";
+
+const SHELL_ASSETS = [
+  "/", "/index.html", "/manifest.webmanifest",
+  "/icons/icon-192.png", "/icons/icon-512.png"
+];
 
 self.addEventListener("install", (event) => {
   event.waitUntil(
-    caches.open(CACHE_NAME)
-      .then((cache) => cache.addAll(STATIC_ASSETS))
-      .then(() => self.skipWaiting())
+    caches.open(APP_SHELL).then((cache) => cache.addAll(SHELL_ASSETS)).then(() => self.skipWaiting())
   );
 });
 
 self.addEventListener("activate", (event) => {
-  event.waitUntil(self.clients.claim());
+  event.waitUntil((async () => {
+    const keys = await caches.keys();
+    await Promise.all(keys.filter(k => k !== APP_SHELL && k !== RUNTIME).map(k => caches.delete(k)));
+    await self.clients.claim();
+  })());
 });
 
 self.addEventListener("fetch", (event) => {
   const req = event.request;
   const url = new URL(req.url);
 
-  // API-Calls und Cross-Origin nicht cachen
+  // Nur Same-Origin kontrollieren
   if (url.origin !== location.origin) return;
 
-  // Navigation -> App-Shell Fallback
+  // Navigationsanfragen -> App-Shell (network-first mit Fallback)
   if (req.mode === "navigate") {
-    event.respondWith(fetch(req).catch(() => caches.match("/index.html")));
+    event.respondWith((async () => {
+      try {
+        const fresh = await fetch(req);
+        const cache = await caches.open(APP_SHELL);
+        cache.put("/", fresh.clone()).catch(()=>{});
+        return fresh;
+      } catch {
+        return (await caches.match(req)) || (await caches.match("/index.html"));
+      }
+    })());
     return;
   }
 
-  // Statische Assets / JSON
+  // JSON (persona/models/styles) -> network-first, dann Cache-Fallback
+  if (url.pathname.endsWith(".json")) {
+    event.respondWith((async () => {
+      const cache = await caches.open(RUNTIME);
+      try {
+        const fresh = await fetch(new Request(req, { cache: "no-store" }));
+        cache.put(req, fresh.clone()).catch(()=>{});
+        return fresh;
+      } catch {
+        const cached = await caches.match(req);
+        if (cached) return cached;
+        // Notfall: leere Antwort mit 503
+        return new Response("{}", { status: 503, headers: { "Content-Type": "application/json" } });
+      }
+    })());
+    return;
+  }
+
+  // Statische Assets -> cache-first
   if (
     url.pathname.startsWith("/assets/") ||
-    url.pathname.startsWith("/icons/") ||
+    url.pathname.startsWith("/icons/")  ||
     url.pathname.endsWith(".js") ||
     url.pathname.endsWith(".css") ||
     url.pathname.endsWith(".png") ||
-    url.pathname.endsWith(".json")
+    url.pathname.endsWith(".svg") ||
+    url.pathname.endsWith(".webp")
   ) {
-    event.respondWith(
-      caches.match(req).then((cacheRes) => {
-        return (
-          cacheRes ||
-          fetch(req).then((fetchRes) => {
-            return caches.open(CACHE_NAME).then((cache) => {
-              cache.put(req, fetchRes.clone());
-              return fetchRes;
-            });
-          })
-        );
-      })
-    );
+    event.respondWith((async () => {
+      const cached = await caches.match(req);
+      if (cached) return cached;
+      const res = await fetch(req);
+      const cache = await caches.open(APP_SHELL);
+      cache.put(req, res.clone()).catch(()=>{});
+      return res;
+    })());
   }
 });

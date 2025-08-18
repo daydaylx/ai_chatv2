@@ -20,9 +20,22 @@ export default function SettingsSheet({ open, tab, onClose }: Props) {
   const settings = useSettings();
   const { apiKey, setApiKey } = useClient();
 
-  // Filter
+  // Filter & Suche
   const [filter, setFilter] = React.useState<Filter>({ free: false, allow_nsfw: false, fast: false });
-  const modelsView = sortModels(filterModels(data.models, filter), settings.favorites);
+  const [query, setQuery] = React.useState("");
+  const filteredBase = React.useMemo(() => sortModels(filterModels(data.models, filter), settings.favorites), [data.models, filter, settings.favorites]);
+  const modelsView = React.useMemo(() => {
+    const q = query.trim().toLowerCase();
+    if (!q) return filteredBase;
+    return filteredBase.filter(m => {
+      const hay = [
+        m.id, m.name ?? "", m.label ?? "",
+        ...(m.tags ?? []),
+        m.description ?? ""
+      ].join(" ").toLowerCase();
+      return hay.includes(q);
+    });
+  }, [filteredBase, query]);
 
   const onPickModel = (id: string) => {
     settings.setModelId(id);
@@ -35,6 +48,7 @@ export default function SettingsSheet({ open, tab, onClose }: Props) {
 
   return (
     <Sheet open={open} onClose={onClose} title="Einstellungen" ariaLabel="Einstellungen">
+      {/* Tab-Navigation (inline) */}
       <div className="flex gap-2 pb-2">
         <TabButton label="Allgemein" current={active==="root"} onClick={() => setActive("root")} />
         <TabButton label="Modell" current={active==="model"} onClick={() => setActive("model")} />
@@ -71,6 +85,7 @@ export default function SettingsSheet({ open, tab, onClose }: Props) {
       {active === "model" && (
         <div className="grid gap-3">
           <div className="flex items-center gap-3">
+            <Input className="max-w-sm" placeholder="Suchen (id, name, tag)…" value={query} onChange={(e)=>setQuery(e.target.value)} aria-label="Modellsuche" />
             <Switch checked={!!filter.free} onCheckedChange={(v)=>setFilter(f=>({...f, free:v}))} label="Free" />
             <Switch checked={!!filter.allow_nsfw} onCheckedChange={(v)=>setFilter(f=>({...f, allow_nsfw:v}))} label="18+ erlaubt" />
             <Switch checked={!!filter.fast} onCheckedChange={(v)=>setFilter(f=>({...f, fast:v}))} label="Schnell" />
@@ -81,7 +96,7 @@ export default function SettingsSheet({ open, tab, onClose }: Props) {
                 <div className="flex-1 min-w-0">
                   <div className="truncate">{m.label ?? m.name ?? m.id}</div>
                   <div className="text-xs opacity-60 truncate">{m.description ?? m.id}</div>
-                  <div className="flex gap-2 pt-1">
+                  <div className="flex gap-2 pt-1 flex-wrap">
                     {m.free ? <Badge>Free</Badge> : null}
                     {m.allow_nsfw ? <Badge>18+</Badge> : null}
                     {(m.context ?? m.ctx) ? <Badge>ctx {m.context ?? m.ctx}</Badge> : null}
@@ -100,6 +115,9 @@ export default function SettingsSheet({ open, tab, onClose }: Props) {
                 </div>
               </div>
             ))}
+            {modelsView.length === 0 && (
+              <div className="text-sm opacity-70 p-2">Keine Modelle gefunden. Filter/Suche lockern.</div>
+            )}
           </div>
         </div>
       )}
@@ -117,7 +135,7 @@ function TabButton({ label, current, onClick }: { label: string; current: boolea
   return (
     <button
       onClick={onClick}
-      className={"h-9 px-3 rounded-full text-sm border " + (current ? "border-accent/60 bg-accent/10" : "border-white/15 hover:bg-white/5")}
+      className={"h-9 px-3 rounded-full text-sm border " + (current ? "border-[hsl(var(--accent-400))] bg-[hsl(var(--accent-100)/0.1)]" : "border-white/15 hover:bg-white/5")}
       aria-current={current ? "page" : undefined}
     >{label}</button>
   );
@@ -128,7 +146,7 @@ function StyleCard({ s, onPick, currentId }: { s: PersonaStyle; onPick: (id: str
   return (
     <button
       onClick={()=>onPick(s.id)}
-      className={"w-full p-3 text-left rounded-2xl border transition " + (active ? "border-accent/70 bg-accent/5" : "border-white/12 hover:bg-white/5")}
+      className={"w-full p-3 text-left rounded-2xl border transition " + (active ? "border-[hsl(var(--accent-400))] bg-[hsl(var(--accent-100)/0.08)]" : "border-white/12 hover:bg-white/5")}
       aria-pressed={active}
     >
       <div className="font-medium">{s.name}</div>

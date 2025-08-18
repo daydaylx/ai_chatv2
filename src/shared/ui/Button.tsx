@@ -1,7 +1,7 @@
 import React from "react";
 import { cn } from "../../shared/lib/cn";
 
-type Variant = "solid" | "ghost" | "outline" | "primary"; // "primary" = Alias für "solid"
+type Variant = "solid" | "ghost" | "outline" | "primary"; // "primary" = Alias zu "solid"
 type Size = "sm" | "md" | "lg" | "icon";
 
 type Props = React.ButtonHTMLAttributes<HTMLButtonElement> & {
@@ -10,7 +10,7 @@ type Props = React.ButtonHTMLAttributes<HTMLButtonElement> & {
 };
 
 export function Button({ className, variant="solid", size="md", ...rest }: Props) {
-  const base = "inline-flex items-center justify-center rounded-xl font-medium transition active:scale-[0.98] focus:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 disabled:opacity-50 disabled:pointer-events-none";
+  const base = "inline-flex items-center justify-center rounded-xl font-medium transition active:scale-[0.98] focus:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 disabled:opacity-70 disabled:pointer-events-none";
   const sizes: Record<Size,string> = {
     sm: "h-9 px-3 text-sm",
     md: "h-11 px-4 text-[15px]",
@@ -19,7 +19,7 @@ export function Button({ className, variant="solid", size="md", ...rest }: Props
   };
   const effective = variant === "primary" ? "solid" : variant;
   const variants: Record<Exclude<Variant,"primary">,string> = {
-    solid: "bg-accent text-white hover:bg-accent/90",
+    solid: "text-white bg-[hsl(var(--accent-600))] hover:bg-[hsl(var(--accent-500))]",
     ghost: "bg-transparent hover:bg-white/5 border border-transparent",
     outline: "bg-transparent border border-white/15 hover:border-white/30",
   };

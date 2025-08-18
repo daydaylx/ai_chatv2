@@ -2,24 +2,55 @@
 @tailwind components;
 @tailwind utilities;
 
-/* Design Tokens / Akzentfarbe via CSS-Variable (Tailwind konfiguriert .text-accent etc.) */
-:root {
-  --accent: 94 80% 45%; /* default violet/amber via tailwind config; wird in utilities genutzt */
+/* ==== Accent Ramp & Theme ==== */
+:root,
+:root[data-accent="violet"] {
+  /* Violet ramp */
+  --accent-50: 270 100% 97%;
+  --accent-100: 270 95% 92%;
+  --accent-200: 270 90% 85%;
+  --accent-400: 270 85% 60%;
+  --accent-500: 270 85% 55%;
+  --accent-600: 270 80% 50%;
+  --accent-800: 270 65% 35%;
+}
+:root[data-accent="amber"] {
+  --accent-50: 38 100% 97%;
+  --accent-100: 38 95% 90%;
+  --accent-200: 38 90% 80%;
+  --accent-400: 38 90% 55%;
+  --accent-500: 38 90% 50%;
+  --accent-600: 38 90% 45%;
+  --accent-800: 38 85% 30%;
+}
+:root[data-accent="jade"] {
+  --accent-50: 160 70% 96%;
+  --accent-100: 160 65% 88%;
+  --accent-200: 160 60% 78%;
+  --accent-400: 160 60% 50%;
+  --accent-500: 160 60% 45%;
+  --accent-600: 160 60% 40%;
+  --accent-800: 160 60% 28%;
 }
 
 html, body, #root { height: 100%; }
 body { background: #000; color: #fff; -webkit-font-smoothing: antialiased; text-rendering: optimizeLegibility; }
-
 * { -webkit-tap-highlight-color: transparent; }
+
+/* Utility Mappings for accent */
+.text-accent { color: hsl(var(--accent-600) / 1); }
+.border-accent { border-color: hsl(var(--accent-600) / 1); }
+
+/* Page gradient */
+.bg-page-gradient {
+  background:
+    radial-gradient(1200px 600px at 50% -10%, hsl(var(--accent-800) / 0.10), transparent 60%),
+    linear-gradient(to bottom, #0A0A0A, #000);
+}
 
 /* Safe-Area + Mobile */
 .safe-bottom { padding-bottom: env(safe-area-inset-bottom); }
 .min-h-dvh { min-height: 100dvh; }
-
-/* Utility Mappings */
-.bg-accent { background-color: hsl(var(--accent) / 1); }
-.text-accent { color: hsl(var(--accent) / 1); }
-.border-accent { border-color: hsl(var(--accent) / 1); }
 
 /* Scroll behavior */
 .overscroll-contain { overscroll-behavior: contain; }

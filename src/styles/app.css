@@ -1,10 +1,11 @@
-/* Leichtgewichtige Basis-Komponenten, gemappt auf Tokens (keine Doppel-Designsysteme mehr) */
-
-/* Buttons sind in src/shared/ui/Button.tsx gekapselt */
-
-/* Chat-Bubbles: in Komponente geregelt; hier nur generische Feinheiten */
+/* Code highlights */
 pre, code { font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", monospace; }
 code { font-size: 0.95em; background: rgba(255,255,255,0.06); padding: 0.15rem 0.35rem; border-radius: 0.5rem; }
 
-/* Fokus sichtbar halten */
-:focus-visible { outline: none; box-shadow: 0 0 0 2px hsl(var(--accent) / 0.9), 0 0 0 4px rgba(255,255,255,0.15); }
+/* Fokus sichtbar und konsistent */
+:focus-visible {
+  outline: none;
+  box-shadow:
+    0 0 0 2px hsl(var(--accent-400) / 0.95),
+    0 0 0 4px rgba(255,255,255,0.15);
+}

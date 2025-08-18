@@ -5,6 +5,8 @@ import { PersonaContext } from "../../entities/persona";
 import { useClient } from "../../lib/client";
 import { MessageBubble } from "../../components/MessageBubble";
 import { ChatInput } from "../../components/ChatInput";
+import { useToast } from "../../shared/ui/Toast";
+import { SettingsContext } from "../../widgets/shell/AppShell";
 
 type Bubble = ChatMessage & { id: string; ts: number };
 const uuid = () => (crypto as any)?.randomUUID?.() ?? `${Date.now()}-${Math.random().toString(36).slice(2,8)}`;
@@ -14,12 +16,13 @@ export default function ChatPanel() {
   const [input, setInput] = React.useState("");
   const [busy, setBusy] = React.useState(false);
   const abortRef = React.useRef<AbortController|null>(null);
-
   const listRef = React.useRef<HTMLDivElement|null>(null);
 
   const settings = useSettings();
   const persona = React.useContext(PersonaContext);
   const { client, getSystemFor } = useClient();
+  const toast = useToast();
+  const openSettings = React.useContext(SettingsContext);
 
   const currentStyle = React.useMemo(()=> persona.data.styles.find(x => x.id === (settings.personaId ?? "")) ?? null, [persona.data.styles, settings.personaId]);
   const systemMsg = React.useMemo(()=> getSystemFor(currentStyle ?? null), [currentStyle, getSystemFor]);
@@ -36,8 +39,16 @@ export default function ChatPanel() {
     const content = input.trim();
     if (!content || busy) return;
 
-    if (!settings.modelId) { alert("Bitte zuerst ein Modell wählen."); return; }
-    if (!systemMsg) { alert("Bitte zuerst einen Stil wählen."); return; }
+    if (!settings.modelId) {
+      toast.show("Wähle zuerst ein Modell.", "error");
+      openSettings("model");
+      return;
+    }
+    if (!systemMsg) {
+      toast.show("Wähle zuerst einen Stil.", "error");
+      openSettings("style");
+      return;
+    }
 
     setBusy(true);
     const ac = new AbortController();

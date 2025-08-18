@@ -36,7 +36,8 @@ export function useModelCatalog(opts: UseModelCatalogOpts) {
   const [st, setSt] = React.useState<State>({ status: "loading", models: [], error: null });
 
   const load = React.useCallback(async (force = false) => {
-    setSt(s => ({ ...s, status: "loading" as const }));
+    // Wichtig: error explizit auf null, nicht s spreaden (Union strict)
+    setSt(prev => ({ status: "loading", models: prev.models, error: null }));
     try {
       const cached = readCache(ttlMin);
       const remote = force || !cached
@@ -91,7 +92,7 @@ function normalizeLocal(list: PersonaModel[]): ModelVM[] {
 function splitIdFlags(rawId: string): { baseId: string; flags: { free: boolean; fast: boolean; allow_nsfw: boolean; tags: string[] } } {
   if (!rawId.includes(":")) return { baseId: rawId, flags: { free: false, fast: false, allow_nsfw: false, tags: [] } };
   const parts = rawId.split(":");
-  const baseId = parts[0];
+  const baseId = parts[0] || rawId; // garantiert string
   const rest = parts.slice(1).map(s => s.trim().toLowerCase()).filter(Boolean);
   const flags = { free: false, fast: false, allow_nsfw: false, tags: [] as string[] };
   for (const t of rest) {
@@ -130,7 +131,7 @@ function mergeLocalRemote(local: ModelVM[], remote: OpenRouterModel[]): ModelVM[
     out.push(enrich({ id: r.id }, r));
   }
 
-  // 3) Sortierung: Favoriten macht UI – hier nur alphabetisch by name/label/id
+  // 3) Sortierung: alphabetisch; Favoriten-Order macht UI
   return out.sort((a, b) => displayName(a).localeCompare(displayName(b)));
 }
 
@@ -147,7 +148,7 @@ function enrich(base: ModelVM, r?: OpenRouterModel): ModelVM {
     vm.ctx = vm.ctx ?? (typeof ctx === "number" ? ctx : undefined);
     vm.context = vm.context ?? (typeof ctx === "number" ? ctx : undefined);
 
-    // Free-Heuristik aus pricing: wenn alle Werte fehlen oder <= 0 → free
+    // Free-Heuristik aus pricing
     const p = (r as any)?.pricing;
     const nums: number[] = [];
     for (const k of ["prompt", "completion"]) {
@@ -163,12 +164,9 @@ function enrich(base: ModelVM, r?: OpenRouterModel): ModelVM {
       vm.free = vm.free || isFree;
     }
 
-    // Fast-Heuristik: turbo/small/7b/8b → eher schnell
+    // Fast-Heuristik
     const rid = r.id.toLowerCase();
     if (/turbo|small|mini|7b|8b/.test(rid)) vm.fast = vm.fast ?? true;
-
-    // NSFW: leider nicht standardisiert; belasse lokale flags, füge Tag wenn bekannt
-    vm.tags = vm.tags ?? [];
   }
   return vm;
 }

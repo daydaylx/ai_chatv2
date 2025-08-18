@@ -1,56 +1,37 @@
-import React, { useEffect, useRef, useState } from "react";
+import React from "react";
+import Button from "../shared/ui/Button";
 
-interface Props {
-  disabled?: boolean;
-  onSend: (text: string) => void;
-  placeholder?: string;
-}
+export function ChatInput({ value, onChange, onSend, busy }:{
+  value: string; onChange: (v: string)=>void; onSend: ()=>void; busy: boolean;
+}) {
+  const taRef = React.useRef<HTMLTextAreaElement|null>(null);
 
-export default function ChatInput({ disabled, onSend, placeholder = "Nachricht eingeben…" }: Props) {
-  const [value, setValue] = useState("");
-  const ref = useRef<HTMLTextAreaElement | null>(null);
-
-  useEffect(() => {
-    const el = ref.current;
+  React.useEffect(() => {
+    // Auto-grow
+    const el = taRef.current;
     if (!el) return;
-    el.style.height = "0px";
-    const next = Math.min(el.scrollHeight, 160);
-    el.style.height = next + "px";
+    el.style.height = "auto";
+    el.style.height = Math.min(180, el.scrollHeight) + "px";
   }, [value]);
 
-  const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
-    if (e.key === "Enter" && !e.shiftKey) {
-      e.preventDefault();
-      doSend();
-    }
-  };
-
-  const doSend = () => {
-    const text = value.trim();
-    if (!text || disabled) return;
-    onSend(text);
-    setValue("");
-  };
-
   return (
-    <div className="input-bar">
-      <textarea
-        ref={ref}
-        className="input-textarea"
-        value={value}
-        onChange={(e) => setValue(e.target.value)}
-        onKeyDown={handleKeyDown}
-        placeholder={placeholder}
-        rows={1}
-        enterKeyHint="send"
-        aria-label="Nachricht"
-        disabled={!!disabled}
-      />
-      <button className="send-button" onClick={doSend} disabled={disabled || value.trim().length === 0} aria-label="Senden">
-        <svg viewBox="0 0 24 24" className="icon">
-          <path d="M3 11l18-8-8 18-2-7-8-3z" fill="currentColor"/>
-        </svg>
-      </button>
+    <div className="sticky bottom-0 inset-x-0 p-2 bg-black/40 backdrop-blur-md border-t border-white/10">
+      <div className="flex gap-2">
+        <textarea
+          ref={taRef}
+          rows={1}
+          className="flex-1 resize-none bg-white/5 border border-white/10 rounded-xl px-3 py-2 outline-none focus:border-accent/70"
+          placeholder="Nachricht schreiben… (Enter=Send, Shift+Enter=Zeile)"
+          value={value}
+          onChange={(e)=>onChange(e.target.value)}
+          onKeyDown={(e)=>{ if (e.key==="Enter" && !e.shiftKey){ e.preventDefault(); onSend(); } }}
+          disabled={busy}
+          enterKeyHint="send"
+          aria-label="Nachricht"
+        />
+        <Button onClick={onSend} disabled={busy || !value.trim()} aria-label={busy ? "Warten" : "Senden"}>{busy ? "…" : "Senden"}</Button>
+      </div>
+      <div className="h-[env(safe-area-inset-bottom)]" />
     </div>
   );
 }

@@ -2,127 +2,24 @@
 @tailwind components;
 @tailwind utilities;
 
-/* === Design Tokens (HSL) === */
-@layer base {
-  :root {
-    --background: 228 30% 7%;
-    --foreground: 220 20% 96%;
-    --card: 228 28% 10%;
-    --card-foreground: 220 20% 96%;
-
-    --primary: 266 72% 60%;
-    --primary-foreground: 220 20% 98%;
-
-    --secondary: 228 22% 16%;
-    --secondary-foreground: 220 20% 96%;
-
-    --muted: 228 18% 28%;
-    --muted-foreground: 226 14% 66%;
-
-    --accent: 199 89% 48%;
-    --accent-foreground: 210 20% 98%;
-
-    --destructive: 0 80% 56%;
-    --destructive-foreground: 0 0% 100%;
-
-    --border: 228 22% 18%;
-    --input: 228 22% 16%;
-    --ring: var(--primary);
-
-    /* Adaptive Density */
-    --space-1: 4px;
-    --space-2: 8px;
-    --space-3: 12px;
-    --space-4: 16px;
-    --radius: 16px;
-  }
-
-  .light {
-    --background: 0 0% 100%;
-    --foreground: 224 14% 12%;
-    --card: 0 0% 100%;
-    --card-foreground: 224 14% 12%;
-
-    --secondary: 220 14% 96%;
-    --secondary-foreground: 224 14% 12%;
-
-    --muted: 220 14% 94%;
-    --muted-foreground: 222 9% 36%;
-
-    --accent: 259 84% 60%;
-    --accent-foreground: 210 20% 98%;
-
-    --destructive: 0 75% 55%;
-    --destructive-foreground: 0 0% 100%;
-
-    --border: 220 13% 90%;
-    --input: 220 13% 90%;
-    --ring: var(--accent);
-  }
-
-  * { @apply border-border; }
-
-  body {
-    @apply bg-background text-foreground antialiased;
-    font-feature-settings: "liga" 1, "calt" 1, "ss01" 1;
-    background:
-      radial-gradient(1200px 800px at 80% -200px, hsl(266 72% 20% / .22), transparent 60%),
-      radial-gradient(1000px 600px at -200px 80%, hsl(199 89% 25% / .18), transparent 60%),
-      linear-gradient(to bottom right, hsl(var(--background)), hsl(228 30% 6%));
-  }
+/* Design Tokens / Akzentfarbe via CSS-Variable (Tailwind konfiguriert .text-accent etc.) */
+:root {
+  --accent: 94 80% 45%; /* default violet/amber via tailwind config; wird in utilities genutzt */
 }
 
-/* === Utilities === */
-@layer utilities {
-  .glass { @apply bg-card/50 backdrop-blur-xl border border-white/10 shadow-[0_10px_40px_-20px_rgba(0,0,0,.6)]; }
-  .glass-heavy { @apply bg-card/65 backdrop-blur-2xl border border-white/15 shadow-[0_14px_60px_-20px_rgba(0,0,0,.7)]; }
+html, body, #root { height: 100%; }
+body { background: #000; color: #fff; -webkit-font-smoothing: antialiased; text-rendering: optimizeLegibility; }
 
-  .text-gradient { @apply bg-clip-text text-transparent bg-gradient-to-r from-primary via-fuchsia-400 to-pink-400; }
+* { -webkit-tap-highlight-color: transparent; }
 
-  .elev-1 { box-shadow: 0 2px 10px rgba(0,0,0,.25); }
-  .elev-2 { box-shadow: 0 8px 30px rgba(0,0,0,.35); }
+/* Safe-Area + Mobile */
+.safe-bottom { padding-bottom: env(safe-area-inset-bottom); }
+.min-h-dvh { min-height: 100dvh; }
 
-  .safe-b { padding-bottom: max(16px, env(safe-area-inset-bottom)); }
-  .safe-t { padding-top: max(12px, env(safe-area-inset-top)); }
+/* Utility Mappings */
+.bg-accent { background-color: hsl(var(--accent) / 1); }
+.text-accent { color: hsl(var(--accent) / 1); }
+.border-accent { border-color: hsl(var(--accent) / 1); }
 
-  .container-mobile { @apply max-w-[680px] mx-auto w-full px-3; }
-
-  /* Fluid Typography */
-  .fluid-title { font-size: clamp(20px, 2.2vw + 0.8rem, 28px); letter-spacing: -0.02em; }
-  .fluid-hero { font-size: clamp(26px, 4.2vw + 1rem, 36px); letter-spacing: -0.02em; }
-  .fluid-sub { font-size: clamp(14px, 1.2vw + .6rem, 18px); }
-
-  /* Adaptive Dichte – kompakter Modus, empfehlenswert für kleine Phones */
-  .density-compact {
-    --space-1: 3px;
-    --space-2: 6px;
-    --space-3: 10px;
-    --space-4: 14px;
-    --radius: 14px;
-  }
-
-  .chip {
-    @apply inline-flex items-center gap-2 h-9 px-3 rounded-xl bg-secondary/60 border border-white/10 text-sm hover:bg-secondary/70;
-  }
-
-  .kbd {
-    @apply inline-flex items-center justify-center px-2 py-[2px] rounded bg-secondary/60 border border-white/15 text-[12px];
-  }
-}
-
-/* Scrollbar dezent */
-::-webkit-scrollbar { width: 6px; height: 6px; }
-::-webkit-scrollbar-thumb { background: hsl(var(--muted) / .35); border-radius: 999px; }
-::-webkit-scrollbar-thumb:hover { background: hsl(var(--muted) / .5); }
-
-/* Focus */
-*:focus-visible { @apply outline-none ring-2 ring-[hsl(var(--ring))] ring-offset-2 ring-offset-background; }
-
-/* Typing Dots */
-.loading-dots span { animation: loading 1.4s infinite both; }
-.loading-dots span:nth-child(2) { animation-delay: .2s; }
-.loading-dots span:nth-child(3) { animation-delay: .4s; }
-@keyframes loading {
-  0%,80%,100% { opacity:.35; transform: scale(.85); }
-  40% { opacity:1; transform: scale(1); }
-}
+/* Scroll behavior */
+.overscroll-contain { overscroll-behavior: contain; }

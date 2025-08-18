@@ -1,14 +1,29 @@
-import React, { ButtonHTMLAttributes } from "react";
+import React from "react";
+import { cn } from "../../shared/lib/cn";
 
-type Variant = "ghost" | "solid" | "primary";
-type Props = ButtonHTMLAttributes<HTMLButtonElement> & { variant?: Variant };
+type Variant = "solid" | "ghost" | "outline" | "primary"; // "primary" = Alias für "solid"
+type Size = "sm" | "md" | "lg" | "icon";
 
-/** Visuell bleibt Theme zuständig; für Tests markiert 'primary' mit 'bg-primary'. */
-export function Button({ className = "", variant = "solid", ...rest }: Props) {
-  let cls = "btn";
-  if (variant === "ghost") cls += " btn--ghost";
-  else cls += " btn--solid";
-  if (variant === "primary") cls += " bg-primary"; // nur Marker
-  return <button className={`${cls} ${className}`.trim()} {...rest} />;
+type Props = React.ButtonHTMLAttributes<HTMLButtonElement> & {
+  variant?: Variant;
+  size?: Size;
+};
+
+export function Button({ className, variant="solid", size="md", ...rest }: Props) {
+  const base = "inline-flex items-center justify-center rounded-xl font-medium transition active:scale-[0.98] focus:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 disabled:opacity-50 disabled:pointer-events-none";
+  const sizes: Record<Size,string> = {
+    sm: "h-9 px-3 text-sm",
+    md: "h-11 px-4 text-[15px]",
+    lg: "h-12 px-5 text-base",
+    icon: "h-11 w-11",
+  };
+  const effective = variant === "primary" ? "solid" : variant;
+  const variants: Record<Exclude<Variant,"primary">,string> = {
+    solid: "bg-accent text-white hover:bg-accent/90",
+    ghost: "bg-transparent hover:bg-white/5 border border-transparent",
+    outline: "bg-transparent border border-white/15 hover:border-white/30",
+  };
+  return <button className={cn(base, sizes[size], variants[effective as "solid"|"ghost"|"outline"], className)} {...rest} />;
 }
+
 export default Button;

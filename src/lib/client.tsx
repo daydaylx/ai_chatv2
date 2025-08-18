@@ -1,64 +1,71 @@
-import React, { createContext, useContext, useMemo, useState } from "react";
-import { OpenRouterClient, type OpenRouterModel } from "./openrouter";
+import React from "react";
+import type { ChatMessage, SendOptions } from "./openrouter";
+import { sendChat } from "./openrouter";
 
-/**
- * Zentraler Client + Model-Availability + Kontextlängen
- */
 type ClientCtx = {
-  client: OpenRouterClient;
   apiKey: string | null;
-  setApiKey: (k: string) => void;
-
-  remoteModels: OpenRouterModel[];
-  remoteIds: Set<string>;
-  remoteLoaded: boolean;
-  refreshModels: () => Promise<void>;
-
-  /** geschätzte Kontextlänge eines Modells (Tokens) */
-  getContextFor: (modelId: string, fallback?: number) => number;
+  setApiKey: (k: string | null) => void;
+  client: { send: (o: Omit<SendOptions, "apiKey">) => Promise<string>; };
+  /** System-Prompt 1:1 aus personas.json (style.system) */
+  getSystemFor: (style: { system: string } | undefined | null) => ChatMessage | null;
 };
 
-const Ctx = createContext<ClientCtx | null>(null);
+export const ClientContext = React.createContext<ClientCtx>({
+  apiKey: null,
+  setApiKey: () => {},
+  client: { send: async () => "" },
+  getSystemFor: () => null,
+});
 
-export function ClientProvider({ children }: { children: React.ReactNode }) {
-  const [client] = useState(() => new OpenRouterClient());
-  const [apiKey, setApiKeyState] = useState<string | null>(client.getApiKey());
-  const [remoteModels, setRemoteModels] = useState<OpenRouterModel[]>([]);
-  const [remoteIds, setRemoteIds] = useState<Set<string>>(new Set());
-  const [remoteLoaded, setRemoteLoaded] = useState(false);
+const KEY = "openrouter_api_key";
 
-  async function refreshModels() {
-    setRemoteLoaded(false);
-    const list = await client.listModelsCached(5 * 60 * 1000);
-    setRemoteModels(list);
-    setRemoteIds(new Set(list.map(m => m.id)));
-    setRemoteLoaded(true);
-  }
-
-  function setApiKey(k: string) {
-    client.setApiKey(k);
-    setApiKeyState(k);
-    void refreshModels();
-  }
-
-  React.useEffect(() => { void refreshModels(); }, []);
-
-  function getContextFor(modelId: string, fallback = 8192): number {
-    const m = remoteModels.find(x => x.id === modelId);
-    return m?.context_length || fallback;
-  }
-
-  const value = useMemo<ClientCtx>(() => ({
-    client, apiKey, setApiKey,
-    remoteModels, remoteIds, remoteLoaded, refreshModels,
-    getContextFor
-  }), [client, apiKey, remoteModels, remoteIds, remoteLoaded]);
-
-  return <Ctx.Provider value={value}>{children}</Ctx.Provider>;
+function readKey(): string | null {
+  try {
+    if (typeof window === "undefined" || !("localStorage" in window)) return null;
+    const v = window.localStorage.getItem(KEY);
+    return v && v.length ? v : null;
+  } catch { return null; }
+}
+function writeKey(v: string | null) {
+  try {
+    if (typeof window === "undefined" || !("localStorage" in window)) return;
+    if (!v) window.localStorage.removeItem(KEY);
+    else window.localStorage.setItem(KEY, v);
+  } catch {}
 }
 
-export function useClient(): ClientCtx {
-  const v = useContext(Ctx);
-  if (!v) throw new Error("useClient must be used within ClientProvider");
-  return v;
+export function ClientProvider({ children }: { children: React.ReactNode }) {
+  const [apiKey, setApiKey] = React.useState<string | null>(readKey());
+
+  const setKey = React.useCallback((k: string | null) => {
+    setApiKey(k ?? null);
+    writeKey(k ?? null);
+  }, []);
+
+  const getSystemFor = React.useCallback((style: { system: string } | undefined | null) => {
+    if (!style) return null;
+    if (import.meta.env?.DEV) {
+      if (typeof style.system !== "string" || !style.system.length) {
+        console.warn("[guard] style.system ist leer/fehlt");
+      }
+    }
+    return { role: "system" as const, content: style.system };
+  }, []);
+
+  const client = React.useMemo(() => ({
+    send: async (o: Omit<SendOptions, "apiKey">) => {
+      if (!apiKey) throw new Error("Kein API-Key gesetzt.");
+      return await sendChat({ apiKey, ...o });
+    }
+  }), [apiKey]);
+
+  return (
+    <ClientContext.Provider value={{ apiKey, setApiKey: setKey, client, getSystemFor }}>
+      {children}
+    </ClientContext.Provider>
+  );
+}
+
+export function useClient() {
+  return React.useContext(ClientContext);
 }

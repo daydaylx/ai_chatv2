@@ -1,55 +1,39 @@
-import { ReactNode, useEffect } from "react";
-import { cn } from "../lib/cn";
-import { motion } from "framer-motion";
+import React from "react";
+import { cn } from "../../shared/lib/cn";
 
 type Props = {
   open: boolean;
   onClose: () => void;
+  children: React.ReactNode;
   title?: string;
-  children: ReactNode;
-  footer?: ReactNode;
+  ariaLabel?: string;
 };
 
-export function Sheet({ open, onClose, title, children, footer }: Props) {
-  useEffect(() => {
-    const onEsc = (e: KeyboardEvent) => { if (e.key === "Escape") onClose(); };
-    document.addEventListener("keydown", onEsc);
-    return () => document.removeEventListener("keydown", onEsc);
-  }, [onClose]);
+export function Sheet({ open, onClose, children, title, ariaLabel }: Props) {
+  React.useEffect(() => {
+    const onKey = (e: KeyboardEvent) => { if (e.key === "Escape") onClose(); };
+    if (open) document.addEventListener("keydown", onKey);
+    return () => document.removeEventListener("keydown", onKey);
+  }, [open, onClose]);
+
+  if (!open) return null;
 
   return (
-    <div
-      aria-hidden={!open}
-      className={cn("fixed inset-0 z-[300]", open ? "pointer-events-auto" : "pointer-events-none")}
-    >
-      <motion.div
-        initial={{ opacity: 0 }}
-        animate={{ opacity: open ? 1 : 0 }}
-        transition={{ duration: 0.18 }}
-        className="absolute inset-0 bg-black/50 backdrop-blur-sm"
-        onClick={onClose}
-        aria-hidden="true"
-      />
-      <motion.aside
+    <div className="fixed inset-0 z-50">
+      <div className="absolute inset-0 bg-black/50" onClick={onClose} aria-hidden="true" />
+      <div
         role="dialog"
         aria-modal="true"
-        aria-label={title ?? "Einstellungen"}
-        initial={{ x: "8%", opacity: 0 }}
-        animate={{ x: open ? 0 : "8%", opacity: open ? 1 : 0 }}
-        transition={{ type: "spring", damping: 24, stiffness: 260 }}
+        aria-label={ariaLabel ?? title ?? "Sheet"}
         className={cn(
-          "absolute right-0 top-0 h-full w-[min(480px,92vw)]",
-          "bg-[var(--surface)] border-l border-[var(--border)] shadow-2xl",
-          "grid grid-rows-[auto_1fr_auto]"
+          "absolute inset-x-0 bottom-0 rounded-t-3xl bg-[#111]/95 backdrop-blur-xl border-t border-white/10 max-h-[85dvh] overflow-auto",
+          "shadow-[0_-12px_60px_rgba(0,0,0,0.5)]"
         )}
       >
-        <header className="flex items-center justify-between gap-3 border-b border-[var(--border)] p-4">
-          <h2 className="text-lg font-bold">{title ?? "Einstellungen"}</h2>
-          <button className="inline-flex h-9 w-9 items-center justify-center rounded-xl border border-border" aria-label="Schließen" onClick={onClose}>✕</button>
-        </header>
-        <div className="overflow-auto p-4 space-y-4">{children}</div>
-        {footer ? <footer className="border-t border-[var(--border)] p-4 flex justify-end">{footer}</footer> : null}
-      </motion.aside>
+        {title && <div className="px-5 pt-4 pb-2 text-sm uppercase tracking-wide opacity-70">{title}</div>}
+        <div className="p-4">{children}</div>
+        <div className="h-[env(safe-area-inset-bottom)]" />
+      </div>
     </div>
   );
 }

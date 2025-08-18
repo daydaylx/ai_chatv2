@@ -1,25 +1,11 @@
 import React from "react";
-import { Message } from "../types";
+import { cn } from "../shared/lib/cn";
 
-interface Props {
-  msg: Message;
-}
-
-export default function MessageBubble({ msg }: Props) {
-  const isUser = msg.role === "user";
+export function MessageBubble({ role, children }: { role: "user"|"assistant"|"system"; children: React.ReactNode }) {
+  const mine = role === "user";
   return (
-    <div className={`bubble-row ${isUser ? "right" : "left"}`}>
-      {!isUser && (
-        <div className="avatar" aria-hidden>
-          <span>🤖</span>
-        </div>
-      )}
-      <div className={`bubble ${isUser ? "user" : "assistant"}`}>
-        <div className="bubble-content">{msg.content}</div>
-        <div className="bubble-meta">
-          {new Date(msg.ts).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}
-        </div>
-      </div>
+    <div className={cn("max-w-[92%] rounded-2xl px-3 py-2 border backdrop-blur", mine ? "bg-accent/15 border-accent/30 ml-auto" : "bg-white/5 border-white/10 mr-auto")}>
+      <div className="whitespace-pre-wrap leading-relaxed">{children}</div>
     </div>
   );
 }

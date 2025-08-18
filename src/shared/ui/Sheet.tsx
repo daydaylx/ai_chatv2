@@ -20,27 +20,32 @@ export function Sheet({ open, onClose, children, title, ariaLabel, describedById
     return () => document.removeEventListener("keydown", onKey);
   }, [open, onClose]);
 
-  // Focus-Trap
+  // Focus-Trap (strict TS + noUncheckedIndexedAccess sicher)
   React.useEffect(() => {
     if (!open) return;
     const panel = panelRef.current!;
     const selectors = [
       "button","[href]","input","select","textarea","[tabindex]:not([tabindex='-1'])"
     ];
-    const getFocusable = () => Array.from(panel.querySelectorAll<HTMLElement>(selectors.join(","))).filter(el => !el.hasAttribute("disabled"));
-    const firstFocus = () => { const f = getFocusable()[0]; (f ?? panel).focus(); };
+    const getFocusable = () =>
+      Array.from(panel.querySelectorAll<HTMLElement>(selectors.join(",")))
+        .filter(el => !el.hasAttribute("disabled"));
+
+    const firstFocus = () => { const nodes = getFocusable(); (nodes[0] ?? panel).focus(); };
+
     const onKeyDown = (e: KeyboardEvent) => {
       if (e.key !== "Tab") return;
       const nodes = getFocusable();
       if (nodes.length === 0) return;
-      const first = nodes[0];
-      const last = nodes[nodes.length - 1];
+      const first = nodes[0]!;
+      const last = nodes[nodes.length - 1]!;
       if (e.shiftKey) {
         if (document.activeElement === first) { last.focus(); e.preventDefault(); }
       } else {
         if (document.activeElement === last) { first.focus(); e.preventDefault(); }
       }
     };
+
     firstFocus();
     panel.addEventListener("keydown", onKeyDown);
     return () => panel.removeEventListener("keydown", onKeyDown);

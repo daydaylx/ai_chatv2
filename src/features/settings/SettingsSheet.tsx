@@ -8,6 +8,8 @@ import { useSettings } from "../../entities/settings/store";
 import { PersonaContext, PersonaStyle } from "../../entities/persona";
 import { useClient } from "../../lib/client";
 import { filterModels, sortModels, Filter } from "../../lib/modelMeta";
+import { Spinner } from "../../shared/ui/Spinner";
+import { OpenRouterClient } from "../../lib/openrouter";
 
 type Tab = "root" | "model" | "style" | "onboarding";
 type Props = { open: boolean; tab: Tab; onClose: () => void; };
@@ -20,9 +22,30 @@ export default function SettingsSheet({ open, tab, onClose }: Props) {
   const settings = useSettings();
   const { apiKey, setApiKey } = useClient();
 
+  // API-Key Status
+  const [checking, setChecking] = React.useState(false);
+  const [keyStatus, setKeyStatus] = React.useState<null | "ok" | "fail">(null);
+
+  async function checkKey() {
+    if (!apiKey) { setKeyStatus("fail"); return; }
+    setChecking(true);
+    try {
+      const cli = new OpenRouterClient({ apiKey });
+      await cli.listModels();
+      setKeyStatus("ok");
+    } catch {
+      setKeyStatus("fail");
+    } finally {
+      setChecking(false);
+    }
+  }
+
   // Filter & Suche
   const [filter, setFilter] = React.useState<Filter>({ free: false, allow_nsfw: false, fast: false });
   const [query, setQuery] = React.useState("");
+  const [initializing, setInitializing] = React.useState(true);
+  React.useEffect(() => { const t = setTimeout(()=>setInitializing(false), 150); return ()=>clearTimeout(t); }, []); // mini delay, verhindert "0 Modelle" flackern
+
   const filteredBase = React.useMemo(() => sortModels(filterModels(data.models, filter), settings.favorites), [data.models, filter, settings.favorites]);
   const modelsView = React.useMemo(() => {
     const q = query.trim().toLowerCase();
@@ -30,8 +53,7 @@ export default function SettingsSheet({ open, tab, onClose }: Props) {
     return filteredBase.filter(m => {
       const hay = [
         m.id, m.name ?? "", m.label ?? "",
-        ...(m.tags ?? []),
-        m.description ?? ""
+        ...(m.tags ?? []), m.description ?? ""
       ].join(" ").toLowerCase();
       return hay.includes(q);
     });
@@ -48,8 +70,8 @@ export default function SettingsSheet({ open, tab, onClose }: Props) {
 
   return (
     <Sheet open={open} onClose={onClose} title="Einstellungen" ariaLabel="Einstellungen">
-      {/* Tab-Navigation (inline) */}
-      <div className="flex gap-2 pb-2">
+      {/* Tabs */}
+      <div className="flex gap-2 pb-2 flex-wrap">
         <TabButton label="Allgemein" current={active==="root"} onClick={() => setActive("root")} />
         <TabButton label="Modell" current={active==="model"} onClick={() => setActive("model")} />
         <TabButton label="Stil" current={active==="style"} onClick={() => setActive("style")} />
@@ -58,22 +80,34 @@ export default function SettingsSheet({ open, tab, onClose }: Props) {
       {active === "root" && (
         <div className="grid gap-4">
           <section className="grid gap-2">
-            <h3 className="text-sm font-semibold opacity-80">OpenRouter API-Key</h3>
-            <div className="flex gap-2">
-              <Input placeholder="sk-or-v1-..." value={apiKey ?? ""} onChange={(e)=>setApiKey(e.target.value || null)} aria-label="API-Key" />
-              <Button variant="outline" onClick={()=>setApiKey(null)}>Löschen</Button>
+            <h3 className="text-sm font-semibold opacity-90">OpenRouter API-Key</h3>
+            <div className="flex gap-2 items-center">
+              <Input
+                placeholder="sk-or-v1-..."
+                value={apiKey ?? ""}
+                onChange={(e)=>{ setApiKey(e.target.value || null); setKeyStatus(null); }}
+                aria-label="API-Key"
+              />
+              <Button variant="outline" onClick={checkKey} aria-label="API-Key prüfen">
+                {checking ? <span className="inline-flex items-center gap-2"><Spinner size={16}/> Prüfen…</span> : "Prüfen"}
+              </Button>
+              <Button variant="outline" onClick={()=>{ setApiKey(null); setKeyStatus(null); }} aria-label="API-Key löschen">Löschen</Button>
             </div>
-            <p className="text-xs opacity-60">Wird lokal (localStorage) gespeichert.</p>
+            <div className="text-xs opacity-70 flex items-center gap-2">
+              <span>Wird lokal (localStorage) gespeichert.</span>
+              {keyStatus === "ok" && <span className="inline-flex items-center gap-1 rounded-full border border-white/15 px-2 py-0.5 text-[11px] text-green-300">✓ Key gültig</span>}
+              {keyStatus === "fail" && <span className="inline-flex items-center gap-1 rounded-full border border-white/15 px-2 py-0.5 text-[11px] text-red-300">✗ Key ungültig</span>}
+            </div>
           </section>
 
           <section className="grid gap-2">
-            <h3 className="text-sm font-semibold opacity-80">Hinweise</h3>
+            <h3 className="text-sm font-semibold opacity-90">Hinweise</h3>
             {error && <div className="text-sm text-red-400">⚠ {error}</div>}
-            {warnings.map((w,i)=> <div key={i} className="text-xs opacity-70">• {w}</div>)}
+            {warnings.map((w,i)=> <div key={i} className="text-xs opacity-80">• {w}</div>)}
           </section>
 
           <section className="grid gap-2">
-            <h3 className="text-sm font-semibold opacity-80">Schnellzugriff</h3>
+            <h3 className="text-sm font-semibold opacity-90">Schnellzugriff</h3>
             <div className="flex gap-2 flex-wrap">
               <Button onClick={()=>setActive("model")} variant="outline">Modell wählen</Button>
               <Button onClick={()=>setActive("style")} variant="outline">Stil wählen</Button>
@@ -84,18 +118,24 @@ export default function SettingsSheet({ open, tab, onClose }: Props) {
 
       {active === "model" && (
         <div className="grid gap-3">
-          <div className="flex items-center gap-3">
-            <Input className="max-w-sm" placeholder="Suchen (id, name, tag)…" value={query} onChange={(e)=>setQuery(e.target.value)} aria-label="Modellsuche" />
-            <Switch checked={!!filter.free} onCheckedChange={(v)=>setFilter(f=>({...f, free:v}))} label="Free" />
-            <Switch checked={!!filter.allow_nsfw} onCheckedChange={(v)=>setFilter(f=>({...f, allow_nsfw:v}))} label="18+ erlaubt" />
-            <Switch checked={!!filter.fast} onCheckedChange={(v)=>setFilter(f=>({...f, fast:v}))} label="Schnell" />
+          {/* Suche eigene Zeile auf Mobile */}
+          <div className="flex flex-col gap-2">
+            <Input placeholder="Suchen (id, name, tag)…" value={query} onChange={(e)=>setQuery(e.target.value)} aria-label="Modellsuche" />
+            <div className="flex items-center gap-3 flex-wrap">
+              <Switch checked={!!filter.free} onCheckedChange={(v)=>setFilter(f=>({...f, free:v}))} label="Free" />
+              <Switch checked={!!filter.allow_nsfw} onCheckedChange={(v)=>setFilter(f=>({...f, allow_nsfw:v}))} label="18+ erlaubt" />
+              <Switch checked={!!filter.fast} onCheckedChange={(v)=>setFilter(f=>({...f, fast:v}))} label="Schnell" />
+            </div>
           </div>
+
           <div className="grid gap-2 max-h-[55dvh] overflow-auto pr-1">
-            {modelsView.map((m)=>(
+            {initializing && <div className="text-sm opacity-70 flex items-center gap-2"><Spinner/> Modelle laden…</div>}
+
+            {!initializing && modelsView.map((m)=>(
               <div key={m.id} className="flex items-center gap-3 p-3 rounded-2xl border border-white/10 hover:bg-white/5">
                 <div className="flex-1 min-w-0">
                   <div className="truncate">{m.label ?? m.name ?? m.id}</div>
-                  <div className="text-xs opacity-60 truncate">{m.description ?? m.id}</div>
+                  <div className="text-xs opacity-70 truncate">{m.description ?? m.id}</div>
                   <div className="flex gap-2 pt-1 flex-wrap">
                     {m.free ? <Badge>Free</Badge> : null}
                     {m.allow_nsfw ? <Badge>18+</Badge> : null}
@@ -115,8 +155,9 @@ export default function SettingsSheet({ open, tab, onClose }: Props) {
                 </div>
               </div>
             ))}
-            {modelsView.length === 0 && (
-              <div className="text-sm opacity-70 p-2">Keine Modelle gefunden. Filter/Suche lockern.</div>
+
+            {!initializing && modelsView.length === 0 && (
+              <div className="text-sm opacity-80 p-2">Keine Modelle gefunden. Suche/Filter anpassen.</div>
             )}
           </div>
         </div>
@@ -135,7 +176,7 @@ function TabButton({ label, current, onClick }: { label: string; current: boolea
   return (
     <button
       onClick={onClick}
-      className={"h-9 px-3 rounded-full text-sm border " + (current ? "border-[hsl(var(--accent-400))] bg-[hsl(var(--accent-100)/0.1)]" : "border-white/15 hover:bg-white/5")}
+      className={"h-9 px-3 rounded-full text-sm border " + (current ? "border-[hsl(var(--accent-400))] bg-[hsl(var(--accent-100)/0.12)]" : "border-white/15 hover:bg-white/5")}
       aria-current={current ? "page" : undefined}
     >{label}</button>
   );
@@ -146,7 +187,7 @@ function StyleCard({ s, onPick, currentId }: { s: PersonaStyle; onPick: (id: str
   return (
     <button
       onClick={()=>onPick(s.id)}
-      className={"w-full p-3 text-left rounded-2xl border transition " + (active ? "border-[hsl(var(--accent-400))] bg-[hsl(var(--accent-100)/0.08)]" : "border-white/12 hover:bg-white/5")}
+      className={"w-full p-3 text-left rounded-2xl border transition " + (active ? "border-[hsl(var(--accent-400))] bg-[hsl(var(--accent-100)/0.10)]" : "border-white/12 hover:bg-white/5")}
       aria-pressed={active}
     >
       <div className="font-medium">{s.name}</div>

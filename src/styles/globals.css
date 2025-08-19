@@ -2,7 +2,26 @@
 @tailwind components;
 @tailwind utilities;
 
-/* ==== Accent Ramp & Theme ==== */
+/* ========= SEMANTIC TOKENS (Dark) ========= */
+:root {
+  /* neutrals (HSL) – soft black, kein totales #000 */
+  --white: 0 0% 100%;
+  --surface-0: 220 14% 8%;   /* page */
+  --surface-1: 220 14% 10%;  /* cards/bubbles */
+  --surface-2: 220 14% 12%;  /* sheets/header */
+
+  /* text levels (als Opazität über weiß) */
+  --text-1: 0.96;
+  --text-2: 0.78;
+  --text-3: 0.62;
+  --placeholder: 0.54;
+
+  /* borders über weiß */
+  --border-1: 0.16; /* 16% */
+  --border-2: 0.28; /* 28% */
+}
+
+/* ========= ACCENT PRESETS ========= */
 :root,
 :root[data-accent="violet"] {
   --accent-50: 270 100% 97%;
@@ -15,49 +34,90 @@
   --accent-700: 270 75% 45%;
   --accent-800: 270 65% 35%;
 }
+
 :root[data-accent="amber"] {
   --accent-50: 38 100% 97%;
   --accent-100: 38 95% 90%;
   --accent-200: 38 90% 80%;
-  --accent-300: 38 90% 65%;
+  --accent-300: 38 90% 64%;
   --accent-400: 38 90% 55%;
   --accent-500: 38 90% 50%;
   --accent-600: 38 90% 45%;
   --accent-700: 38 88% 40%;
   --accent-800: 38 85% 30%;
 }
+
 :root[data-accent="jade"] {
   --accent-50: 160 70% 96%;
   --accent-100: 160 65% 88%;
   --accent-200: 160 60% 78%;
   --accent-300: 160 60% 62%;
   --accent-400: 160 60% 50%;
-  --accent-500: 160 60% 45%;
+  --accent-500: 160 60% 46%;
   --accent-600: 160 60% 40%;
   --accent-700: 160 60% 34%;
   --accent-800: 160 60% 28%;
 }
 
+:root[data-accent="blue"] {
+  --accent-50: 210 100% 97%;
+  --accent-100: 210 95% 90%;
+  --accent-200: 210 90% 82%;
+  --accent-300: 210 88% 68%;
+  --accent-400: 210 85% 58%;
+  --accent-500: 210 85% 52%;
+  --accent-600: 210 80% 48%;
+  --accent-700: 210 75% 42%;
+  --accent-800: 210 70% 34%;
+}
+
+/* ========= GLOBAL BASE ========= */
 html, body, #root { height: 100%; }
-body { background: #0A0A0A; color: #fff; -webkit-font-smoothing: antialiased; text-rendering: optimizeLegibility; }
+body {
+  background: hsl(var(--surface-0));
+  color: hsl(var(--white) / var(--text-1));
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+}
 * { -webkit-tap-highlight-color: transparent; }
 
-/* Utility Mappings for accent */
-.text-accent { color: hsl(var(--accent-600) / 1); }
-.border-accent { border-color: hsl(var(--accent-600) / 1); }
-.bg-accent-soft { background-color: hsl(var(--accent-200) / 0.10); }
-.bg-accent-strong { background-color: hsl(var(--accent-600) / 1); }
-
-/* Page gradient: mehr „freundliche“ Fläche */
+/* Page gradient – freundlichere Fläche */
 .bg-page-gradient {
   background:
     radial-gradient(1000px 500px at 60% -10%, hsl(var(--accent-300) / 0.16), transparent 60%),
-    linear-gradient(to bottom, #0A0A0A, #000);
+    linear-gradient(to bottom, hsl(var(--surface-2)), hsl(var(--surface-0)));
 }
 
-/* Safe-Area + Mobile */
+/* ===== Utility classes (Tokens → Klassen) ===== */
+.bg-surface-0 { background-color: hsl(var(--surface-0)); }
+.bg-surface-1 { background-color: hsl(var(--surface-1)); }
+.bg-surface-2 { background-color: hsl(var(--surface-2)); }
+
+.text-1 { color: hsl(var(--white) / var(--text-1)); }
+.text-2 { color: hsl(var(--white) / var(--text-2)); }
+.text-3 { color: hsl(var(--white) / var(--text-3)); }
+.text-muted { color: hsl(var(--white) / var(--placeholder)); }
+
+.border-1 { border-color: hsl(var(--white) / var(--border-1)); }
+.border-2 { border-color: hsl(var(--white) / var(--border-2)); }
+
+.text-accent { color: hsl(var(--accent-600)); }
+.border-accent { border-color: hsl(var(--accent-600)); }
+.bg-accent-soft { background-color: hsl(var(--accent-200) / 0.12); }
+
+/* Fokus einheitlich & sichtbar */
+:focus-visible {
+  outline: none;
+  box-shadow:
+    0 0 0 2px hsl(var(--accent-400) / 0.95),
+    0 0 0 4px hsl(var(--white) / 0.15);
+}
+
+/* Helpers */
 .safe-bottom { padding-bottom: env(safe-area-inset-bottom); }
 .min-h-dvh { min-height: 100dvh; }
-
-/* Scroll behavior */
 .overscroll-contain { overscroll-behavior: contain; }
+
+/* Code-Blocks */
+pre, code { font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", monospace; }
+code { font-size: 0.95em; background: hsl(var(--white) / 0.06); padding: 0.15rem 0.35rem; border-radius: 0.5rem; }

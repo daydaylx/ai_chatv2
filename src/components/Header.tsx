@@ -19,10 +19,10 @@ export default function Header() {
     return s?.name ?? settings.personaId ?? "Stil wählen";
   }, [data.styles, settings.personaId]);
 
-  const chip = "px-3 h-9 rounded-full border border-white/15 text-sm hover:bg-white/5 max-w-[44vw] truncate";
+  const chip = "px-3 h-9 rounded-full border border-1 text-sm hover:bg-accent-soft max-w-[44vw] truncate";
 
   return (
-    <div className="sticky top-0 inset-x-0 z-40 bg-[#0A0A0A]/85 backdrop-blur border-b border-white/10">
+    <div className="sticky top-0 inset-x-0 z-40 bg-surface-2/85 backdrop-blur border-b border-1">
       <div className="px-4 py-2 flex items-center gap-3">
         <div className="text-sm font-semibold tracking-wide opacity-90">ai_chatv2</div>
         <div className="ml-auto flex items-center gap-2">

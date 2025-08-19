@@ -20,7 +20,7 @@ export function Sheet({ open, onClose, children, title, ariaLabel, describedById
     return () => document.removeEventListener("keydown", onKey);
   }, [open, onClose]);
 
-  // Focus-Trap (strict TS + noUncheckedIndexedAccess sicher)
+  // Focus-Trap
   React.useEffect(() => {
     if (!open) return;
     const panel = panelRef.current!;
@@ -36,7 +36,7 @@ export function Sheet({ open, onClose, children, title, ariaLabel, describedById
     const onKeyDown = (e: KeyboardEvent) => {
       if (e.key !== "Tab") return;
       const nodes = getFocusable();
-      if (nodes.length === 0) return;
+      if (!nodes.length) return;
       const first = nodes[0]!;
       const last = nodes[nodes.length - 1]!;
       if (e.shiftKey) {
@@ -64,17 +64,17 @@ export function Sheet({ open, onClose, children, title, ariaLabel, describedById
         aria-labelledby={title ? titleId : undefined}
         aria-describedby={describedById}
         className={cn(
-          "absolute inset-x-0 bottom-0 rounded-t-3xl bg-[#0B0B0B]/95 backdrop-blur-xl border-t border-white/10 max-h-[85dvh] overflow-auto",
+          "absolute inset-x-0 bottom-0 rounded-t-3xl bg-[hsl(var(--surface-2)/0.96)] backdrop-blur-xl border-t border-1 max-h-[85dvh] overflow-auto",
           "shadow-[0_-12px_60px_rgba(0,0,0,0.5)] focus:outline-none"
         )}
         tabIndex={-1}
       >
         <div className="flex items-center justify-between px-5 pt-4 pb-2">
-          {title ? <div id={titleId} className="text-sm uppercase tracking-wide opacity-70">{title}</div> : <div />}
+          {title ? <div id={titleId} className="text-sm uppercase tracking-wide text-2"> {title}</div> : <div />}
           <button
             onClick={onClose}
             aria-label="Schließen"
-            className="h-9 w-9 rounded-full border border-white/15 hover:bg-white/5 focus-visible:ring-2 focus-visible:ring-[hsl(var(--accent-400))]"
+            className="h-9 w-9 rounded-full border border-1 hover:bg-accent-soft focus-visible:ring-2 focus-visible:ring-[hsl(var(--accent-400))]"
           >✕</button>
         </div>
         <div className="p-4">{children}</div>

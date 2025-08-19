@@ -11,6 +11,7 @@ import { filterModels, sortModels, Filter } from "../../lib/modelMeta";
 import { Spinner } from "../../shared/ui/Spinner";
 import { useModelCatalog } from "../../lib/catalog";
 import { getAccent, setAccent, Accent } from "../../shared/lib/theme";
+import { ruleForStyle, baseModelId } from "../../config/styleModelRules";
 
 type Tab = "root" | "model" | "style" | "onboarding";
 type Props = { open: boolean; tab: Tab; onClose: () => void; };
@@ -34,7 +35,24 @@ export default function SettingsSheet({ open, tab, onClose }: Props) {
   const [filter, setFilter] = React.useState<Filter>({ free: false, allow_nsfw: false, fast: false });
   const [query, setQuery] = React.useState("");
 
-  const base = React.useMemo(() => sortModels(filterModels(catalog.models as any, filter), settings.favorites), [catalog.models, filter, settings.favorites]);
+  // Stilabhängige Einschränkung
+  const currentStyle = React.useMemo(
+    () => persona.data.styles.find(x => x.id === (settings.personaId ?? "")) ?? null,
+    [persona.data.styles, settings.personaId]
+  );
+  const styleRule = ruleForStyle(settings.personaId ?? null, currentStyle?.name ?? null);
+
+  const baseAll = React.useMemo(
+    () => sortModels(filterModels(catalog.models as any, filter), settings.favorites),
+    [catalog.models, filter, settings.favorites]
+  );
+  const base = React.useMemo(() => {
+    if (!styleRule) return baseAll;
+    const allowed = new Set(styleRule.allowed.map(baseModelId));
+    return baseAll.filter(m => allowed.has(baseModelId(m.id)));
+  }, [baseAll, styleRule]);
+
+  // Suche anwenden
   const view = React.useMemo(() => {
     const q = query.trim().toLowerCase();
     if (!q) return base;
@@ -118,6 +136,7 @@ export default function SettingsSheet({ open, tab, onClose }: Props) {
               <Switch checked={!!filter.allow_nsfw} onCheckedChange={(v)=>setFilter(f=>({...f, allow_nsfw:v}))} label="18+ erlaubt" />
               <Switch checked={!!filter.fast} onCheckedChange={(v)=>setFilter(f=>({...f, fast:v}))} label="Schnell" />
               <span className="text-xs text-3">{isLoading ? "Lädt…" : `${view.length} Treffer`}</span>
+              {styleRule && <span className="text-xs text-3">· durch Stil eingeschränkt</span>}
               {hasError && <button className="text-xs underline opacity-80 hover:opacity-100" onClick={()=>catalog.refresh()}>Erneut versuchen</button>}
             </div>
           </div>
@@ -151,7 +170,11 @@ export default function SettingsSheet({ open, tab, onClose }: Props) {
             ))}
 
             {!isLoading && view.length === 0 && (
-              <div className="text-sm opacity-85 p-2">Keine Modelle gefunden. Suche/Filter anpassen.</div>
+              <div className="text-sm opacity-85 p-2">
+                {styleRule
+                  ? "Keine Modelle innerhalb der Stil-Einschränkung gefunden. Prüfe die Regel oder entferne die Stilbindung."
+                  : "Keine Modelle gefunden. Suche/Filter anpassen."}
+              </div>
             )}
           </div>
         </div>

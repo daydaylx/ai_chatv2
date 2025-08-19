@@ -8,6 +8,7 @@ import { ChatInput } from "../../components/ChatInput";
 import { useToast } from "../../shared/ui/Toast";
 import { SettingsContext } from "../../widgets/shell/AppShell";
 import { ScrollToEnd } from "../../components/ScrollToEnd";
+import { ruleForStyle, baseModelId } from "../../config/styleModelRules";
 
 type Bubble = ChatMessage & { id: string; ts: number };
 const uuid = () => (crypto as any)?.randomUUID?.() ?? `${Date.now()}-${Math.random().toString(36).slice(2,8)}`;
@@ -40,7 +41,6 @@ export default function ChatPanel() {
   }
 
   async function send() {
-    // Wenn wir streamen: Button handelt als "Stop"
     if (busy) { try { abortRef.current?.abort(); } catch {} return; }
 
     const content = input.trim();
@@ -55,6 +55,26 @@ export default function ChatPanel() {
       toast.show("Wähle zuerst einen Stil.", "error");
       openSettings("style");
       return;
+    }
+
+    // Regel: Stil → Modell(e)
+    const r = ruleForStyle(settings.personaId ?? null, currentStyle?.name ?? null);
+    if (r) {
+      const cur = baseModelId(settings.modelId);
+      const allowed = new Set(r.allowed.map(baseModelId));
+      if (!allowed.has(cur)) {
+        if (r.blockSend) {
+          toast.show(`Stil erfordert Modelle: ${r.allowed.join(", ")}`, "error");
+          openSettings("model");
+          return;
+        } else {
+          const candidate = (r.prefer?.[0] ?? r.allowed[0]) || null;
+          if (candidate) {
+            useSettings.getState().setModelId(candidate);
+            toast.show(`Modell automatisch auf „${candidate}“ gewechselt (Stil-Vorgabe).`, "info");
+          }
+        }
+      }
     }
 
     setBusy(true);
@@ -81,7 +101,7 @@ export default function ChatPanel() {
 
       let accum = "";
       await client.send({
-        model: settings.modelId!,
+        model: useSettings.getState().modelId!, // falls Auto-Switch
         messages,
         signal: ac.signal,
         onToken: (delta) => {
@@ -101,7 +121,6 @@ export default function ChatPanel() {
     }
   }
 
-  // Für Screenreader: letzte Assistant-Bubble markieren (TS-safe)
   const lastAssistantId = React.useMemo(() => {
     for (let i = items.length - 1; i >= 0; i--) {
       const m = items[i];

@@ -25,8 +25,11 @@ export default function ChatPanel() {
   const toast = useToast();
   const openSettings = React.useContext(SettingsContext);
 
-  const currentStyle = React.useMemo(()=> persona.data.styles.find(x => x.id === (settings.personaId ?? "")) ?? null, [persona.data.styles, settings.personaId]);
-  const systemMsg = React.useMemo(()=> getSystemFor(currentStyle ?? null), [currentStyle, getSystemFor]);
+  const currentStyle = React.useMemo(
+    () => persona.data.styles.find(x => x.id === (settings.personaId ?? "")) ?? null,
+    [persona.data.styles, settings.personaId]
+  );
+  const systemMsg = React.useMemo(() => getSystemFor(currentStyle ?? null), [currentStyle, getSystemFor]);
 
   React.useEffect(() => { scrollToEnd(); }, [items.length]);
 
@@ -37,7 +40,7 @@ export default function ChatPanel() {
   }
 
   async function send() {
-    // wenn busy → Abbruch
+    // Wenn wir streamen: Button handelt als "Stop"
     if (busy) { try { abortRef.current?.abort(); } catch {} return; }
 
     const content = input.trim();
@@ -64,7 +67,11 @@ export default function ChatPanel() {
     setInput("");
 
     try {
-      const messages: ChatMessage[] = [systemMsg, ...items.map(({role, content}) => ({role, content})), { role: "user", content }];
+      const messages: ChatMessage[] = [
+        systemMsg,
+        ...items.map(({role, content}) => ({role, content})),
+        { role: "user", content }
+      ];
 
       if (import.meta.env?.DEV) {
         const chosen = currentStyle?.system ?? "";
@@ -84,7 +91,9 @@ export default function ChatPanel() {
       });
 
     } catch (e: any) {
-      const msg = String(e?.name || "").toLowerCase() === "aborterror" ? "⏹️ abgebrochen" : `❌ ${String(e?.message ?? e)}`;
+      const msg = String(e?.name || "").toLowerCase() === "aborterror"
+        ? "⏹️ abgebrochen"
+        : `❌ ${String(e?.message ?? e)}`;
       setItems(prev => prev.map(b => b.id === asst.id ? ({ ...b, content: (b.content || msg) }) : b));
     } finally {
       setBusy(false);
@@ -92,9 +101,12 @@ export default function ChatPanel() {
     }
   }
 
-  // Für Screenreader: die letzte Assistant-Bubble bekommt aria-live
+  // Für Screenreader: letzte Assistant-Bubble markieren (TS-safe)
   const lastAssistantId = React.useMemo(() => {
-    for (let i = items.length - 1; i >= 0; i--) if (items[i].role === "assistant") return items[i].id;
+    for (let i = items.length - 1; i >= 0; i--) {
+      const m = items[i];
+      if (m && m.role === "assistant") return m.id;
+    }
     return null;
   }, [items]);
 
@@ -112,7 +124,7 @@ export default function ChatPanel() {
             key={it.id}
             className="flex"
             role="listitem"
-            {...(it.id === lastAssistantId ? { "aria-live": "polite", "aria-atomic": true } : {})}
+            {...(it.id === lastAssistantId ? { "aria-live": "polite" as const, "aria-atomic": true } : {})}
           >
             <MessageBubble role={it.role}>{it.content || " "}</MessageBubble>
           </div>

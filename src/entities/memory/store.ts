@@ -13,18 +13,18 @@ export type MemoryEntry = {
 
 export type MemoryState = {
   enabled: boolean;
+  autoExtract: boolean;   // NEU: automatische Chat-Extraktion
   entries: MemoryEntry[];
 };
 
 type Listener = () => void;
 
 const LS_ENABLED = "memory.enabled.v1";
+const LS_AUTO    = "memory.autoExtract.v1";
 const LS_ENTRIES = "memory.entries.v1";
 
 function now() { return Date.now(); }
-function uuid() {
-  try { return (crypto as any)?.randomUUID?.() ?? ""; } catch { return ""; }
-}
+function uuid() { try { return (crypto as any)?.randomUUID?.() ?? ""; } catch { return ""; } }
 function safeParse<T>(raw: string | null, fallback: T): T {
   if (!raw) return fallback;
   try { return JSON.parse(raw) as T; } catch { return fallback; }
@@ -32,6 +32,7 @@ function safeParse<T>(raw: string | null, fallback: T): T {
 
 function loadInitial(): MemoryState {
   const enabled = safeParse<boolean>(localStorage.getItem(LS_ENABLED), false);
+  const auto    = safeParse<boolean>(localStorage.getItem(LS_AUTO), true); // standardmäßig AN, weil gewünscht
   const entries = safeParse<MemoryEntry[]>(localStorage.getItem(LS_ENTRIES), []);
   const pruned = entries.filter(e => {
     if (e.ttlDays == null) return true;
@@ -41,7 +42,7 @@ function loadInitial(): MemoryState {
   if (pruned.length !== entries.length) {
     try { localStorage.setItem(LS_ENTRIES, JSON.stringify(pruned)); } catch {}
   }
-  return { enabled: !!enabled, entries: pruned };
+  return { enabled: !!enabled, autoExtract: !!auto, entries: pruned };
 }
 
 const store = {
@@ -50,6 +51,7 @@ const store = {
   set(partial: Partial<MemoryState>) {
     store.state = { ...store.state, ...partial };
     try { localStorage.setItem(LS_ENABLED, JSON.stringify(store.state.enabled)); } catch {}
+    try { localStorage.setItem(LS_AUTO,    JSON.stringify(store.state.autoExtract)); } catch {}
     try { localStorage.setItem(LS_ENTRIES, JSON.stringify(store.state.entries)); } catch {}
     store.listeners.forEach(l => l());
   },
@@ -62,6 +64,7 @@ export function useMemory() {
   const state = React.useSyncExternalStore(subscribe, getSnapshot, getSnapshot);
 
   const enable = React.useCallback((on: boolean) => { store.set({ enabled: !!on }); }, []);
+  const setAutoExtract = React.useCallback((on: boolean) => { store.set({ autoExtract: !!on }); }, []);
 
   const add = React.useCallback((text: string, tags: string[] = [], opts?: { ttlDays?: number | null; confidence?: number }) => {
     const entry: MemoryEntry = {
@@ -95,5 +98,16 @@ export function useMemory() {
     store.set({ entries: next });
   }, []);
 
-  return { enabled: state.enabled, entries: state.entries, enable, add, update, remove, purge, touchAll };
+  return {
+    enabled: state.enabled,
+    autoExtract: state.autoExtract,
+    entries: state.entries,
+    enable,
+    setAutoExtract,
+    add,
+    update,
+    remove,
+    purge,
+    touchAll,
+  };
 }

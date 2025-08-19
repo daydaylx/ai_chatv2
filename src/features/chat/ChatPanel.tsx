@@ -11,6 +11,7 @@ import { ScrollToEnd } from "../../components/ScrollToEnd";
 import { ruleForStyle, isModelAllowed } from "../../config/styleModelRules";
 import { useMemory } from "../../entities/memory/store";
 import { injectMemory } from "../../lib/memoryPipeline";
+import { extractFromChat } from "../memory/extract";
 
 type Bubble = ChatMessage & { id: string; ts: number };
 const uuid = () => (crypto as any)?.randomUUID?.() ?? `${Date.now()}-${Math.random().toString(36).slice(2,8)}`;
@@ -84,6 +85,8 @@ export default function ChatPanel() {
     setItems(prev => [...prev, user, asst]);
     setInput("");
 
+    let accum = "";
+
     try {
       // Basismessages: Stil + History + aktuelle User-Nachricht
       const base: ChatMessage[] = [
@@ -100,9 +103,8 @@ export default function ChatPanel() {
       }
 
       // Memory injizieren (als 2. System-Nachricht) + Budget grob kürzen
-      const messages = injectMemory(base, { enabled: memory.enabled, entries: memory.entries }, { maxChars: 12000 });
+      const messages = injectMemory(base, { enabled: memory.enabled, autoExtract: memory.autoExtract, entries: memory.entries }, { maxChars: 12000 });
 
-      let accum = "";
       await client.send({
         model: settings.modelId!,
         messages,
@@ -112,6 +114,15 @@ export default function ChatPanel() {
           setItems(prev => prev.map((b) => b.id === asst.id ? ({ ...b, content: accum }) : b));
         }
       });
+
+      // Nach dem Turn: Auto-Extraktion aus Chatturn
+      if (memory.enabled && memory.autoExtract) {
+        const candidates = extractFromChat(content, accum);
+        if (candidates.length) {
+          for (const c of candidates) memory.add(c.text, c.tags, { ttlDays: c.ttlDays ?? 90, confidence: c.confidence ?? 0.75 });
+          toast.show(`🧠 ${candidates.length} Kontextpunkt(e) gespeichert.`, "info");
+        }
+      }
 
       // Memory "gesehen"
       if (memory.enabled && memory.entries.length) {

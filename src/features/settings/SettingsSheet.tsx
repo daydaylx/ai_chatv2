@@ -250,6 +250,7 @@ function MemoryTab() {
     <div className="grid gap-4">
       <div className="flex items-center gap-3 flex-wrap">
         <Switch checked={m.enabled} onCheckedChange={m.enable} label="Gedächtnis aktiv" />
+        <Switch checked={m.autoExtract} onCheckedChange={m.setAutoExtract} label="Automatisch aus Chat extrahieren" />
         <div className="text-xs text-3">
           Wird als <b>zweite System-Nachricht</b> gesendet. Stil-Prompt (1) bleibt unverändert.
         </div>

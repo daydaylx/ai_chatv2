@@ -3,6 +3,11 @@ import Header from "../../components/Header";
 import SettingsSheet from "../../features/settings/SettingsSheet";
 import { ToastProvider } from "../../shared/ui/Toast";
 import { initAccent } from "../../shared/lib/theme";
+import { useSettings } from "../../entities/settings/store";
+import { PersonaContext } from "../../entities/persona";
+import { useClient } from "../../lib/client";
+import { useModelCatalog } from "../../lib/catalog";
+import { chooseDefaultModel } from "../../config/defaults";
 
 export type SettingsOpenTab = "root" | "model" | "style" | "onboarding";
 export const SettingsContext = React.createContext<(tab?: SettingsOpenTab)=>void>(()=>{});
@@ -11,7 +16,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
   const [open, setOpen] = React.useState(false);
   const [tab, setTab] = React.useState<SettingsOpenTab>("root");
 
-  // Apply saved accent on mount
+  // Theme init
   React.useEffect(() => { initAccent("violet"); }, []);
 
   const openSettings = React.useCallback((t?: SettingsOpenTab) => {
@@ -39,6 +44,19 @@ export function AppShell({ children }: { children: React.ReactNode }) {
       history.back();
     }
   }, []);
+
+  // === Default-Modell festlegen, falls noch keines gewählt ===
+  const settings = useSettings();
+  const persona = React.useContext(PersonaContext);
+  const { apiKey } = useClient();
+  const catalog = useModelCatalog({ local: persona.data.models, apiKey });
+
+  React.useEffect(() => {
+    if (settings.modelId) return;                    // Nutzer hat schon eins gewählt
+    if (catalog.status !== "ready") return;          // warte auf Katalog
+    const id = chooseDefaultModel(catalog.models as any);
+    if (id) settings.setModelId(id);
+  }, [settings.modelId, catalog.status, catalog.models, settings]);
 
   return (
     <ToastProvider>

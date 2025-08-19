@@ -7,6 +7,7 @@ import { MessageBubble } from "../../components/MessageBubble";
 import { ChatInput } from "../../components/ChatInput";
 import { useToast } from "../../shared/ui/Toast";
 import { SettingsContext } from "../../widgets/shell/AppShell";
+import { ScrollToEnd } from "../../components/ScrollToEnd";
 
 type Bubble = ChatMessage & { id: string; ts: number };
 const uuid = () => (crypto as any)?.randomUUID?.() ?? `${Date.now()}-${Math.random().toString(36).slice(2,8)}`;
@@ -36,8 +37,11 @@ export default function ChatPanel() {
   }
 
   async function send() {
+    // wenn busy → Abbruch
+    if (busy) { try { abortRef.current?.abort(); } catch {} return; }
+
     const content = input.trim();
-    if (!content || busy) return;
+    if (!content) return;
 
     if (!settings.modelId) {
       toast.show("Wähle zuerst ein Modell.", "error");
@@ -80,16 +84,19 @@ export default function ChatPanel() {
       });
 
     } catch (e: any) {
-      setItems(prev => prev.map(b => b.id === asst.id ? ({ ...b, content: `❌ ${String(e?.message ?? e)}` }) : b));
+      const msg = String(e?.name || "").toLowerCase() === "aborterror" ? "⏹️ abgebrochen" : `❌ ${String(e?.message ?? e)}`;
+      setItems(prev => prev.map(b => b.id === asst.id ? ({ ...b, content: (b.content || msg) }) : b));
     } finally {
       setBusy(false);
       abortRef.current = null;
     }
   }
 
-  function stop() {
-    try { abortRef.current?.abort(); } catch {}
-  }
+  // Für Screenreader: die letzte Assistant-Bubble bekommt aria-live
+  const lastAssistantId = React.useMemo(() => {
+    for (let i = items.length - 1; i >= 0; i--) if (items[i].role === "assistant") return items[i].id;
+    return null;
+  }, [items]);
 
   return (
     <div className="flex flex-col h-full">
@@ -101,13 +108,19 @@ export default function ChatPanel() {
           </div>
         )}
         {items.map((it) => (
-          <div key={it.id} className="flex" role="listitem">
+          <div
+            key={it.id}
+            className="flex"
+            role="listitem"
+            {...(it.id === lastAssistantId ? { "aria-live": "polite", "aria-atomic": true } : {})}
+          >
             <MessageBubble role={it.role}>{it.content || " "}</MessageBubble>
           </div>
         ))}
       </div>
 
-      <ChatInput value={input} onChange={setInput} onSend={busy ? stop : send} busy={busy} />
+      <ScrollToEnd target={listRef} />
+      <ChatInput value={input} onChange={setInput} onSend={send} busy={busy} />
     </div>
   );
 }

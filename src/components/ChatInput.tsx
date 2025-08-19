@@ -28,7 +28,9 @@ export function ChatInput({ value, onChange, onSend, busy }:{
           enterKeyHint="send"
           aria-label="Nachricht"
         />
-        <Button onClick={onSend} disabled={busy || !value.trim()} aria-label={busy ? "Warten" : "Senden"}>{busy ? "…" : "Senden"}</Button>
+        <Button onClick={onSend} variant={busy ? "outline" : "solid"} aria-label={busy ? "Stop" : "Senden"}>
+          {busy ? "Stop" : "Senden"}
+        </Button>
       </div>
       <div className="h-[env(safe-area-inset-bottom)]" />
     </div>

@@ -3,11 +3,13 @@ import Button from "../shared/ui/Button";
 import { useSettings } from "../entities/settings/store";
 import { PersonaContext } from "../entities/persona";
 import { SettingsContext } from "../widgets/shell/AppShell";
+import { useMemory } from "../entities/memory/store";
 
 export default function Header() {
   const openSettings = React.useContext(SettingsContext);
   const { data } = React.useContext(PersonaContext);
   const settings = useSettings();
+  const memory = useMemory();
 
   const modelName = React.useMemo(() => {
     const m = data.models.find(x => x.id === settings.modelId);
@@ -31,6 +33,14 @@ export default function Header() {
           </button>
           <button className={chip} onClick={() => openSettings("style")} aria-label="Stil wechseln">
             <span className="opacity-70">Stil:</span> <span className="ml-1 truncate">{styleName}</span>
+          </button>
+          <button
+            className={chip + (memory.enabled ? " border-[hsl(var(--accent-400))] bg-[hsl(var(--accent-100)/0.12)]" : "")}
+            onClick={() => openSettings("memory")}
+            aria-label="Gedächtnis"
+            title={memory.enabled ? "Gedächtnis aktiv" : "Gedächtnis inaktiv"}
+          >
+            🧠 <span className="ml-1">{memory.enabled ? "aktiv" : "aus"}</span>
           </button>
           <Button variant="outline" size="sm" onClick={() => openSettings("root")} aria-label="Einstellungen">⚙️</Button>
         </div>

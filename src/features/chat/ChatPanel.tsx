@@ -8,7 +8,9 @@ import { ChatInput } from "../../components/ChatInput";
 import { useToast } from "../../shared/ui/Toast";
 import { SettingsContext } from "../../widgets/shell/AppShell";
 import { ScrollToEnd } from "../../components/ScrollToEnd";
-import { ruleForStyle, isModelAllowed, baseModelId } from "../../config/styleModelRules";
+import { ruleForStyle, isModelAllowed } from "../../config/styleModelRules";
+import { useMemory } from "../../entities/memory/store";
+import { injectMemory } from "../../lib/memoryPipeline";
 
 type Bubble = ChatMessage & { id: string; ts: number };
 const uuid = () => (crypto as any)?.randomUUID?.() ?? `${Date.now()}-${Math.random().toString(36).slice(2,8)}`;
@@ -25,6 +27,7 @@ export default function ChatPanel() {
   const { client, getSystemFor } = useClient();
   const toast = useToast();
   const openSettings = React.useContext(SettingsContext);
+  const memory = useMemory();
 
   const currentStyle = React.useMemo(
     () => persona.data.styles.find(x => x.id === (settings.personaId ?? "")) ?? null,
@@ -60,18 +63,15 @@ export default function ChatPanel() {
     // Stil→Modell-Regel (ID + Name)
     const rule = ruleForStyle(settings.personaId ?? null, currentStyle?.name ?? null);
     if (rule) {
-      const ok = isModelAllowed(rule, settings.modelId, null); // Name kennen wir hier nicht zuverlässig
+      const ok = isModelAllowed(rule, settings.modelId, null);
       if (!ok) {
-        if (rule.blockSend) {
-          const brief = [
-            ...(rule.allowedIds ?? []),
-            ...(rule.allowedPatterns ?? []).map(p => `/${p}/`)
-          ].slice(0, 6).join(", ");
-          toast.show(`Stil erfordert bestimmte Modelle. Erlaubt: ${brief || "siehe Liste"}`, "error");
-          openSettings("model");
-          return;
-        }
-        // (Optionaler Auto-Switch wäre hier möglich, falls du preferIds pflegst)
+        const brief = [
+          ...(rule.allowedIds ?? []),
+          ...(rule.allowedPatterns ?? []).map(p => `/${p}/`)
+        ].slice(0, 6).join(", ");
+        toast.show(`Stil erfordert bestimmte Modelle. Erlaubt: ${brief || "siehe Liste"}`, "error");
+        openSettings("model");
+        return;
       }
     }
 
@@ -85,17 +85,22 @@ export default function ChatPanel() {
     setInput("");
 
     try {
-      const messages: ChatMessage[] = [
+      // Basismessages: Stil + History + aktuelle User-Nachricht
+      const base: ChatMessage[] = [
         systemMsg,
         ...items.map(({role, content}) => ({role, content})),
         { role: "user", content }
       ];
 
+      // Dev-Guard: Stil 1:1
       if (import.meta.env?.DEV) {
         const chosen = currentStyle?.system ?? "";
-        const sys = messages[0]?.content ?? "";
+        const sys = base[0]?.content ?? "";
         if (chosen !== sys) console.warn("[guard] System-Prompt weicht ab (nicht 1:1)");
       }
+
+      // Memory injizieren (als 2. System-Nachricht) + Budget grob kürzen
+      const messages = injectMemory(base, { enabled: memory.enabled, entries: memory.entries }, { maxChars: 12000 });
 
       let accum = "";
       await client.send({
@@ -107,6 +112,11 @@ export default function ChatPanel() {
           setItems(prev => prev.map((b) => b.id === asst.id ? ({ ...b, content: accum }) : b));
         }
       });
+
+      // Memory "gesehen"
+      if (memory.enabled && memory.entries.length) {
+        memory.touchAll();
+      }
 
     } catch (e: any) {
       const msg = String(e?.name || "").toLowerCase() === "aborterror"

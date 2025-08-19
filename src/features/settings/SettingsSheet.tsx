@@ -12,8 +12,9 @@ import { Spinner } from "../../shared/ui/Spinner";
 import { useModelCatalog } from "../../lib/catalog";
 import { getAccent, setAccent, Accent } from "../../shared/lib/theme";
 import { ruleForStyle, isModelAllowed } from "../../config/styleModelRules";
+import { useMemory } from "../../entities/memory/store";
 
-type Tab = "root" | "model" | "style" | "onboarding";
+type Tab = "root" | "model" | "style" | "memory" | "onboarding";
 type Props = { open: boolean; tab: Tab; onClose: () => void; };
 
 export default function SettingsSheet({ open, tab, onClose }: Props) {
@@ -23,6 +24,7 @@ export default function SettingsSheet({ open, tab, onClose }: Props) {
   const persona = React.useContext(PersonaContext);
   const settings = useSettings();
   const { apiKey, setApiKey } = useClient();
+  const memory = useMemory();
 
   // Accent
   const [accent, setAccentState] = React.useState<Accent>(() => getAccent());
@@ -50,7 +52,7 @@ export default function SettingsSheet({ open, tab, onClose }: Props) {
 
   const base = React.useMemo(() => {
     if (!styleRule) return baseAll;
-    return baseAll.filter(m => isModelAllowed(styleRule, m.id, (m as any).name ?? (m as any).label ?? null));
+    return baseAll.filter(m => isModelAllowed(styleRule!, m.id, (m as any).name ?? (m as any).label ?? null));
   }, [baseAll, styleRule]);
 
   // Suche anwenden
@@ -80,6 +82,7 @@ export default function SettingsSheet({ open, tab, onClose }: Props) {
         <TabButton label="Allgemein" current={active==="root"} onClick={() => setActive("root")} />
         <TabButton label={`Modell${view.length ? ` (${view.length})` : ""}`} current={active==="model"} onClick={() => setActive("model")} />
         <TabButton label="Stil" current={active==="style"} onClick={() => setActive("style")} />
+        <TabButton label="Gedächtnis" current={active==="memory"} onClick={() => setActive("memory")} />
       </div>
 
       {active === "root" && (
@@ -113,16 +116,11 @@ export default function SettingsSheet({ open, tab, onClose }: Props) {
           </section>
 
           <section className="grid gap-2">
-            <h3 className="text-sm font-semibold text-2">Hinweise</h3>
-            {persona.error && <div className="text-sm text-red-400">⚠ {persona.error}</div>}
-            {persona.warnings.map((w,i)=> <div key={i} className="text-xs text-3">• {w}</div>)}
-          </section>
-
-          <section className="grid gap-2">
             <h3 className="text-sm font-semibold text-2">Schnellzugriff</h3>
             <div className="flex gap-2 flex-wrap">
               <Button onClick={()=>setActive("model")} variant="outline">Modell wählen</Button>
               <Button onClick={()=>setActive("style")} variant="outline">Stil wählen</Button>
+              <Button onClick={()=>setActive("memory")} variant="outline">Gedächtnis</Button>
             </div>
           </section>
         </div>
@@ -186,6 +184,10 @@ export default function SettingsSheet({ open, tab, onClose }: Props) {
           {persona.data.styles.map((s)=> <StyleCard key={s.id} s={s} currentId={useSettings.getState().personaId ?? undefined} onPick={onPickStyle} />)}
         </div>
       )}
+
+      {active === "memory" && (
+        <MemoryTab />
+      )}
     </Sheet>
   );
 }
@@ -231,5 +233,65 @@ function AccentChip({ a, current, onPick }: { a: Accent; current: Accent; onPick
     >
       {label}
     </button>
+  );
+}
+
+/* ---------------- Memory Tab ---------------- */
+function MemoryTab() {
+  const m = useMemory();
+  const [text, setText] = React.useState("");
+  const [tags, setTags] = React.useState("");
+
+  const list = React.useMemo(() => {
+    return [...m.entries].sort((a,b)=> (b.updatedAt ?? 0) - (a.updatedAt ?? 0));
+  }, [m.entries]);
+
+  return (
+    <div className="grid gap-4">
+      <div className="flex items-center gap-3 flex-wrap">
+        <Switch checked={m.enabled} onCheckedChange={m.enable} label="Gedächtnis aktiv" />
+        <div className="text-xs text-3">
+          Wird als <b>zweite System-Nachricht</b> gesendet. Stil-Prompt (1) bleibt unverändert.
+        </div>
+      </div>
+
+      <div className="grid gap-2">
+        <h3 className="text-sm font-semibold text-2">Eintrag hinzufügen</h3>
+        <textarea
+          rows={3}
+          className="w-full resize-y bg-white/8 border border-1 rounded-xl px-3 py-2 outline-none focus:border-[hsl(var(--accent-400))] placeholder:text-muted"
+          placeholder="Kurzer Fakt, Präferenz, Arbeitskontext…"
+          value={text}
+          onChange={(e)=>setText(e.target.value)}
+        />
+        <div className="flex gap-2 items-center">
+          <Input placeholder="Tags (kommagetrennt)" value={tags} onChange={(e)=>setTags(e.target.value)} />
+          <Button
+            onClick={()=>{ if (text.trim()) { m.add(text.trim(), tags.split(",").map(s=>s.trim()).filter(Boolean)); setText(""); setTags(""); } }}
+            disabled={!text.trim()}
+          >Speichern</Button>
+          <Button variant="outline" onClick={()=>m.purge()}>Alles löschen</Button>
+        </div>
+      </div>
+
+      <div className="grid gap-2">
+        <h3 className="text-sm font-semibold text-2">Gespeicherte Einträge ({list.length})</h3>
+        <div className="grid gap-2 max-h-[48dvh] overflow-auto pr-1">
+          {list.length === 0 && <div className="text-sm text-3">Keine Einträge vorhanden.</div>}
+          {list.map(e => (
+            <div key={e.id} className="p-3 rounded-2xl border border-1 hover:bg-accent-soft">
+              <div className="text-sm whitespace-pre-wrap">{e.text}</div>
+              <div className="flex gap-2 mt-1 flex-wrap">
+                {e.tags.map(t => <Badge key={t}>{t}</Badge>)}
+                <span className="text-xs text-3">Confidence {(Math.round(e.confidence*100))}%</span>
+              </div>
+              <div className="mt-2 flex gap-2">
+                <Button size="sm" variant="outline" onClick={()=>m.remove(e.id)}>Löschen</Button>
+              </div>
+            </div>
+          ))}
+        </div>
+      </div>
+    </div>
   );
 }

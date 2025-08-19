@@ -9,7 +9,7 @@ import { useClient } from "../../lib/client";
 import { useModelCatalog } from "../../lib/catalog";
 import { chooseDefaultModel } from "../../config/defaults";
 
-export type SettingsOpenTab = "root" | "model" | "style" | "onboarding";
+export type SettingsOpenTab = "root" | "model" | "style" | "memory" | "onboarding";
 export const SettingsContext = React.createContext<(tab?: SettingsOpenTab)=>void>(()=>{});
 
 export function AppShell({ children }: { children: React.ReactNode }) {

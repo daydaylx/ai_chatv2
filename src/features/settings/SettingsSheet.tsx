@@ -11,7 +11,7 @@ import { filterModels, sortModels, Filter } from "../../lib/modelMeta";
 import { Spinner } from "../../shared/ui/Spinner";
 import { useModelCatalog } from "../../lib/catalog";
 import { getAccent, setAccent, Accent } from "../../shared/lib/theme";
-import { ruleForStyle, baseModelId } from "../../config/styleModelRules";
+import { ruleForStyle, isModelAllowed } from "../../config/styleModelRules";
 
 type Tab = "root" | "model" | "style" | "onboarding";
 type Props = { open: boolean; tab: Tab; onClose: () => void; };
@@ -35,21 +35,22 @@ export default function SettingsSheet({ open, tab, onClose }: Props) {
   const [filter, setFilter] = React.useState<Filter>({ free: false, allow_nsfw: false, fast: false });
   const [query, setQuery] = React.useState("");
 
-  // Stilabhängige Einschränkung
+  // Basisliste
+  const baseAll = React.useMemo(
+    () => sortModels(filterModels(catalog.models as any, filter), settings.favorites),
+    [catalog.models, filter, settings.favorites]
+  );
+
+  // Stilabhängige Einschränkung (ID + Name)
   const currentStyle = React.useMemo(
     () => persona.data.styles.find(x => x.id === (settings.personaId ?? "")) ?? null,
     [persona.data.styles, settings.personaId]
   );
   const styleRule = ruleForStyle(settings.personaId ?? null, currentStyle?.name ?? null);
 
-  const baseAll = React.useMemo(
-    () => sortModels(filterModels(catalog.models as any, filter), settings.favorites),
-    [catalog.models, filter, settings.favorites]
-  );
   const base = React.useMemo(() => {
     if (!styleRule) return baseAll;
-    const allowed = new Set(styleRule.allowed.map(baseModelId));
-    return baseAll.filter(m => allowed.has(baseModelId(m.id)));
+    return baseAll.filter(m => isModelAllowed(styleRule, m.id, (m as any).name ?? (m as any).label ?? null));
   }, [baseAll, styleRule]);
 
   // Suche anwenden
@@ -172,7 +173,7 @@ export default function SettingsSheet({ open, tab, onClose }: Props) {
             {!isLoading && view.length === 0 && (
               <div className="text-sm opacity-85 p-2">
                 {styleRule
-                  ? "Keine Modelle innerhalb der Stil-Einschränkung gefunden. Prüfe die Regel oder entferne die Stilbindung."
+                  ? "Keine Modelle innerhalb der Stil-Einschränkung gefunden. Prüfe Regeln oder entferne die Stilbindung."
                   : "Keine Modelle gefunden. Suche/Filter anpassen."}
               </div>
             )}

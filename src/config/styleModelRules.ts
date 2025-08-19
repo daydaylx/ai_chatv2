@@ -1,89 +1,121 @@
 export type StyleModelRule = {
-  /** Erlaubte Modelle (Basis-IDs ohne Suffixe wie ":free") */
-  allowed: string[];
-  /** Bevorzugte Reihenfolge – erster Treffer wird beim Auto-Switch gewählt */
-  prefer?: string[];
+  /** Exakt erlaubte Basis-IDs (ohne lokale Suffixe wie ":free") */
+  allowedIds?: string[];
   /**
-   * true  → Senden blockieren, wenn aktuelles Modell nicht erlaubt (öffnet Picker).
-   * false → automatisch auf prefer[0] oder erstes allowed wechseln (mit Toast).
+   * Zusätzliche Pattern (Regex-Strings, case-insensitive) gegen ID ODER Anzeigenamen.
+   * Beispiel: "venice.*dolphin.*24b", "nemo.*12b", "mistral.*(large|small|nemo)", "goliath", "rocinante"
    */
-  blockSend?: boolean;
+  allowedPatterns?: string[];
+  /** Optional bevorzugte IDs (nur Auto-Switch, falls du später möchtest) */
+  preferIds?: string[];
+  /** true = Senden blockieren, wenn Modell nicht erlaubt; false = Auto-Switch (hier standardmäßig true für Sicherheit) */
+  blockSend: boolean;
 };
 
-/** Basis-ID aus evtl. lokal erweiterten IDs extrahieren (z. B. "…:free") */
 export function baseModelId(id: string): string {
   const idx = id.indexOf(":");
   return idx === -1 ? id : id.slice(0, idx);
 }
 
-/** Slugs für Styles (IDs/Namen werden darauf gemappt) */
-type StyleSlug = "unzensiert" | "nsfw_experte" | "sex_therapeuth" | "nsfw_roleplay";
+/** Prüft, ob ein Modell (ID + optionaler Name) unter eine Regel fällt */
+export function isModelAllowed(rule: StyleModelRule, modelId: string, modelName?: string | null): boolean {
+  const id = baseModelId(modelId).toLowerCase();
+  const name = (modelName ?? "").toLowerCase();
 
-/** Kanonische Regeln – passe Model-IDs bei Bedarf an deine Realität an */
+  if (rule.allowedIds?.some(x => baseModelId(x).toLowerCase() === id)) return true;
+  if (rule.allowedPatterns?.length) {
+    for (const pat of rule.allowedPatterns) {
+      try {
+        const rx = new RegExp(pat, "i");
+        if (rx.test(id) || (name && rx.test(name))) return true;
+      } catch { /* invalid regex ignored */ }
+    }
+  }
+  return false;
+}
+
+/* -------- Slugs & Mapping -------- */
+type StyleSlug = "unzensiert" | "nsfw_experte" | "sex_therapeut" | "nsfw_roleplay";
+
+/**
+ * Mapping-Regeln (an deine Liste angelehnt):
+ * - Venice Dolphin Mistral 24B Venice Edition  → "venice.*dolphin.*24b"
+ * - Nothing is Real NeMo 12B                   → "nothing.*is.*real|nemo.*12b"
+ * - Mistral Large/Small/Nemo                   → "mistral.*(large|small|nemo)"
+ * - Community: Goliath, lzlv 70B, Rocinante, Cydonia v1 (22B), Euryale, Rocinante 12B
+ */
 const RULES: Record<StyleSlug, StyleModelRule> = {
-  // 1) „Unzensiert“
   unzensiert: {
-    allowed: [
-      "cognitivecomputations/dolphin-mixtral-8x7b",
-      "cognitivecomputations/dolphin-mistral-7b",
-      "qwen/qwen2.5-32b-instruct",
+    // Fokus auf konsequent unzensierte/freie Modelle
+    allowedPatterns: [
+      "venice.*dolphin.*24b",            // Venice Dolphin 24B Venice Edition
+      "(nothing.*is.*real).*nemo.*12b",  // (falls Name so geführt)
+      "nemo.*12b",                       // NeMo 12B (generisch)
+      "mistral.*(large|small|nemo)",     // Mistral-Varianten unzensiert
+      "goliath",
+      "lzlv.*70b",
+      "rocinante(?!.*12b)?",             // Rocinante (ohne 12B spezifisch)
+      "cydonia.*(v1)?(.*22b)?",
+      "euryale"
     ],
-    prefer: ["cognitivecomputations/dolphin-mixtral-8x7b"],
-    blockSend: false,
+    // Falls du exakte IDs kennst, pflege sie zusätzlich:
+    allowedIds: [
+      // Beispiel: "veniceai/venice-dolphin-mistral-24b"
+    ],
+    blockSend: true
   },
 
-  // 2) „NSFW Experte“
   nsfw_experte: {
-    allowed: [
-      "cognitivecomputations/dolphin-mixtral-8x7b",
-      "qwen/qwen2.5-32b-instruct",
+    // Explizit Venice Dolphin + Mistral Nemo/Familie
+    allowedPatterns: [
+      "venice.*dolphin.*24b",
+      "mistral.*nemo.*12b",
+      "mistral.*(large|small)",
+      "goliath"
     ],
-    prefer: ["cognitivecomputations/dolphin-mixtral-8x7b"],
-    blockSend: false,
+    allowedIds: [],
+    blockSend: true
   },
 
-  // 3) „Sex Therapeuth“ (bewusst Schreibweise wie von dir)
-  sex_therapeuth: {
-    allowed: [
-      "qwen/qwen2.5-32b-instruct",
-      "meta-llama/llama-3.1-70b-instruct",
+  sex_therapeut: { // korrigierte Schreibweise
+    // Fokus auf seriöseren, kohärenten Helfern – Mistral Large/Nemo
+    allowedPatterns: [
+      "mistral.*large",
+      "mistral.*nemo.*12b",
+      "cydonia.*v1",
     ],
-    prefer: ["qwen/qwen2.5-32b-instruct"],
-    blockSend: true, // bewusst restriktiv
+    allowedIds: [],
+    blockSend: true
   },
 
-  // 4) „NSFW Roleplay“
   nsfw_roleplay: {
-    allowed: [
-      "cognitivecomputations/dolphin-mixtral-8x7b",
-      "cognitivecomputations/dolphin-mistral-7b",
+    // Primär: Nothing is Real NeMo 12B + Rollenspiel-freundliche
+    allowedPatterns: [
+      "(nothing.*is.*real).*nemo.*12b",
+      "nemo.*12b",
+      "rocinante.*12b",
+      "euryale",
+      "venice.*dolphin.*24b"
     ],
-    prefer: ["cognitivecomputations/dolphin-mixtral-8x7b"],
-    blockSend: false,
-  },
+    allowedIds: [],
+    blockSend: true
+  }
 };
 
-/** ID/Name robust auf einen Regel-Slug mappen */
-function matchStyleSlug(styleId?: string | null, styleName?: string | null): StyleSlug | null {
-  const text = `${styleId ?? ""} ${styleName ?? ""}`.toLowerCase();
-
-  if (/unzensi|uncensor/.test(text)) return "unzensiert";
-  if (/nsfw.*(expert|experte)/.test(text)) return "nsfw_experte";
-  if (/sex.*therap/.test(text)) return "sex_therapeuth";
-  if (/nsfw.*role|role.*play/.test(text)) return "nsfw_roleplay";
-
+/** Robust: per ID oder Name auf Slug abbilden (deutsch + häufige Tippfehler) */
+function resolveSlug(styleId?: string | null, styleName?: string | null): StyleSlug | null {
+  const t = `${styleId ?? ""} ${styleName ?? ""}`.toLowerCase();
+  if (/unzensi|uncensor/.test(t)) return "unzensiert";
+  if (/nsfw.*(expert|experte)/.test(t)) return "nsfw_experte";
+  if (/sex.*therap(eut|euth)/.test(t)) return "sex_therapeut"; // „Therapeut“ und „Therapeuth“
+  if (/nsfw.*role|role.*play/.test(t)) return "nsfw_roleplay";
   return null;
 }
 
-/**
- * Hole die passende Regel für einen Stil.
- * - Greift per Stil-ID oder (Fallback) Name-Substring.
- * - Gibt null zurück, wenn keine Bindung vorgesehen ist.
- */
 export function ruleForStyle(styleId: string | null | undefined, styleName?: string | null): StyleModelRule | null {
-  const slug = matchStyleSlug(styleId, styleName);
+  const slug = resolveSlug(styleId, styleName);
   return slug ? RULES[slug] : null;
 }
 
-/** Optional: Rohdaten exportieren (Debug/Tests) */
+/** Export (Debug/Tests) */
 export const STYLE_MODEL_RULES = RULES;

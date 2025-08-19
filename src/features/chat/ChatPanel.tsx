@@ -8,7 +8,7 @@ import { ChatInput } from "../../components/ChatInput";
 import { useToast } from "../../shared/ui/Toast";
 import { SettingsContext } from "../../widgets/shell/AppShell";
 import { ScrollToEnd } from "../../components/ScrollToEnd";
-import { ruleForStyle, baseModelId } from "../../config/styleModelRules";
+import { ruleForStyle, isModelAllowed, baseModelId } from "../../config/styleModelRules";
 
 type Bubble = ChatMessage & { id: string; ts: number };
 const uuid = () => (crypto as any)?.randomUUID?.() ?? `${Date.now()}-${Math.random().toString(36).slice(2,8)}`;
@@ -57,23 +57,21 @@ export default function ChatPanel() {
       return;
     }
 
-    // Regel: Stil → Modell(e)
-    const r = ruleForStyle(settings.personaId ?? null, currentStyle?.name ?? null);
-    if (r) {
-      const cur = baseModelId(settings.modelId);
-      const allowed = new Set(r.allowed.map(baseModelId));
-      if (!allowed.has(cur)) {
-        if (r.blockSend) {
-          toast.show(`Stil erfordert Modelle: ${r.allowed.join(", ")}`, "error");
+    // Stil→Modell-Regel (ID + Name)
+    const rule = ruleForStyle(settings.personaId ?? null, currentStyle?.name ?? null);
+    if (rule) {
+      const ok = isModelAllowed(rule, settings.modelId, null); // Name kennen wir hier nicht zuverlässig
+      if (!ok) {
+        if (rule.blockSend) {
+          const brief = [
+            ...(rule.allowedIds ?? []),
+            ...(rule.allowedPatterns ?? []).map(p => `/${p}/`)
+          ].slice(0, 6).join(", ");
+          toast.show(`Stil erfordert bestimmte Modelle. Erlaubt: ${brief || "siehe Liste"}`, "error");
           openSettings("model");
           return;
-        } else {
-          const candidate = (r.prefer?.[0] ?? r.allowed[0]) || null;
-          if (candidate) {
-            useSettings.getState().setModelId(candidate);
-            toast.show(`Modell automatisch auf „${candidate}“ gewechselt (Stil-Vorgabe).`, "info");
-          }
         }
+        // (Optionaler Auto-Switch wäre hier möglich, falls du preferIds pflegst)
       }
     }
 
@@ -101,7 +99,7 @@ export default function ChatPanel() {
 
       let accum = "";
       await client.send({
-        model: useSettings.getState().modelId!, // falls Auto-Switch
+        model: settings.modelId!,
         messages,
         signal: ac.signal,
         onToken: (delta) => {

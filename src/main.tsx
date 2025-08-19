@@ -1,11 +1,7 @@
 import React from "react";
 import ReactDOM from "react-dom/client";
 import App from "./App";
-import "./index.css";
-import { registerSW } from "./registerSW";
-
-// Wichtig: keine Argumente – Pfad/Logik ist in registerSW gekapselt
-registerSW();
+import "./styles/globals.css"; // <-- einziges globales CSS, MUSS NACH allen alten Styles kommen (alte Imports löschen)
 
 ReactDOM.createRoot(document.getElementById("root")!).render(
   <React.StrictMode>

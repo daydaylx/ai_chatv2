@@ -14,9 +14,13 @@ import { injectMemory } from "../../lib/memoryPipeline";
 
 type Bubble = ChatMessage & { id: string; ts: number };
 
-const uuid = () =>
-  ((crypto as any)?.randomUUID?.()) ||
-  (Date.now().toString() + "-" + Math.random().toString(36).slice(2, 8));
+function makeUuid(): string {
+  const anyCrypto = (crypto as any);
+  if (anyCrypto && typeof anyCrypto.randomUUID === "function") {
+    return anyCrypto.randomUUID();
+  }
+  return Date.now().toString() + "-" + Math.random().toString(36).slice(2, 8);
+}
 
 export default function ChatPanel() {
   const [items, setItems] = React.useState<Bubble[]>([]);
@@ -28,7 +32,7 @@ export default function ChatPanel() {
   // Scroll-Setup
   const listRef = React.useRef<HTMLDivElement | null>(null);
   const tailRef = React.useRef<HTMLDivElement | null>(null);
-  const shouldStickRef = React.useRef<boolean>(true); // am Ende kleben?
+  const shouldStickRef = React.useRef<boolean>(true); // true = am Ende kleben
 
   const settings = useSettings();
   const persona = React.useContext(PersonaContext);
@@ -37,50 +41,46 @@ export default function ChatPanel() {
   const openSettings = React.useContext(SettingsContext);
   const memory = useMemory();
 
-  const currentStyle = React.useMemo(
-    () =>
-      persona.data.styles.find(
-        (x) => x.id === (settings.personaId ?? "")
-      ) ?? null,
-    [persona.data.styles, settings.personaId]
-  );
+  const currentStyle = React.useMemo(() => {
+    const id = settings.personaId ?? "";
+    return persona.data.styles.find((x) => x.id === id) ?? null;
+  }, [persona.data.styles, settings.personaId]);
 
-  const systemMsg = React.useMemo(
-    () => getSystemFor(currentStyle ?? null),
-    [currentStyle, getSystemFor]
-  );
+  const systemMsg = React.useMemo(() => {
+    return getSystemFor(currentStyle ?? null);
+  }, [currentStyle, getSystemFor]);
 
   // Scroll-Listener: aktualisiert shouldStickRef
   React.useEffect(() => {
     const el = listRef.current;
     if (!el) return;
 
-    const computeStick = () => {
-      shouldStickRef.current =
-        el.scrollTop + el.clientHeight >= el.scrollHeight - 120;
-    };
+    function computeStick(): void {
+      shouldStickRef.current = el.scrollTop + el.clientHeight >= el.scrollHeight - 120;
+    }
 
-    const onScroll = () => computeStick();
+    function onScroll(): void {
+      computeStick();
+    }
+
     el.addEventListener("scroll", onScroll, { passive: true });
-    // Initial
     computeStick();
 
-    // Reagieren auf Größenänderungen (Streaming / Fonts)
-    const ro =
-      typeof ResizeObserver !== "undefined"
-        ? new ResizeObserver(() => {
-            if (shouldStickRef.current) {
-              requestAnimationFrame(() => {
-                tailRef.current?.scrollIntoView({ block: "end" });
-              });
-            }
-          })
-        : null;
-    ro?.observe(el);
+    const ro = typeof ResizeObserver !== "undefined"
+      ? new ResizeObserver(() => {
+          if (shouldStickRef.current) {
+            requestAnimationFrame(() => {
+              if (tailRef.current) tailRef.current.scrollIntoView({ block: "end" });
+            });
+          }
+        })
+      : null;
+
+    if (ro) ro.observe(el);
 
     return () => {
       el.removeEventListener("scroll", onScroll);
-      ro?.disconnect();
+      if (ro) ro.disconnect();
     };
   }, []);
 
@@ -88,15 +88,17 @@ export default function ChatPanel() {
   React.useEffect(() => {
     if (!shouldStickRef.current) return;
     requestAnimationFrame(() => {
-      tailRef.current?.scrollIntoView({ block: "end" });
+      if (tailRef.current) tailRef.current.scrollIntoView({ block: "end" });
     });
   }, [items.length]);
 
-  async function send() {
+  async function send(): Promise<void> {
     if (busy) {
       try {
-        abortRef.current?.abort();
-      } catch {}
+        if (abortRef.current) abortRef.current.abort();
+      } catch {
+        // ignore
+      }
       return;
     }
 
@@ -115,18 +117,23 @@ export default function ChatPanel() {
     }
 
     // Stil→Modell-Regel (ID + Name)
-    const rule = ruleForStyle(settings.personaId ?? null, currentStyle?.name ?? null);
+    const rule = ruleForStyle(settings.personaId ?? null, currentStyle ? currentStyle.name : null);
     if (rule) {
       const ok = isModelAllowed(rule, settings.modelId, null);
       if (!ok) {
-        const brief = [
-          ...(rule.allowedIds ?? []),
-          ...(rule.allowedPatterns ?? []).map(function (p) { return "/" + p + "/"; }),
-        ].slice(0, 6).join(", ");
-        toast.show(
-          "Stil erfordert bestimmte Modelle. Erlaubt: " + (brief || "siehe Liste"),
-          "error"
-        );
+        const parts: string[] = [];
+        if (rule.allowedIds && rule.allowedIds.length) {
+          for (let i = 0; i < rule.allowedIds.length && parts.length < 6; i++) {
+            parts.push(rule.allowedIds[i]);
+          }
+        }
+        if (rule.allowedPatterns && rule.allowedPatterns.length) {
+          for (let i = 0; i < rule.allowedPatterns.length && parts.length < 6; i++) {
+            parts.push("/" + rule.allowedPatterns[i] + "/");
+          }
+        }
+        const brief = parts.join(", ");
+        toast.show("Stil erfordert bestimmte Modelle. Erlaubt: " + (brief || "siehe Liste"), "error");
         openSettings("model");
         return;
       }
@@ -139,24 +146,27 @@ export default function ChatPanel() {
     // Beim Senden: ans Ende pinnen
     shouldStickRef.current = true;
 
-    const user: Bubble = { id: uuid(), role: "user", content, ts: Date.now() };
-    const asst: Bubble = { id: uuid(), role: "assistant", content: "", ts: Date.now() };
-    setItems((prev) => [...prev, user, asst]);
+    const user: Bubble = { id: makeUuid(), role: "user", content, ts: Date.now() };
+    const asst: Bubble = { id: makeUuid(), role: "assistant", content: "", ts: Date.now() };
+    setItems((prev) => prev.concat(user, asst));
     setInput("");
 
     try {
       // Basis-Verlauf (Stil + History + aktuelle User-Nachricht)
-      const base: ChatMessage[] = [
-        systemMsg,
-        ...items.map(({ role, content }) => ({ role, content })),
-        { role: "user", content },
-      ];
+      const history: ChatMessage[] = items.map(function (it) {
+        return { role: it.role, content: it.content };
+      });
+
+      const base: ChatMessage[] = [systemMsg].concat(history).concat([{ role: "user", content }]);
 
       // Dev-Guard: Stil 1:1
-      if (import.meta.env?.DEV) {
-        const chosen = currentStyle?.system ?? "";
-        const sys = (base.length > 0 ? base[0].content : "") ?? "";
-        if (chosen !== sys) console.warn("[guard] System-Prompt weicht ab (nicht 1:1)");
+      if (import.meta.env && (import.meta.env as any).DEV) {
+        const chosen = currentStyle && currentStyle.system ? currentStyle.system : "";
+        const sys = base.length > 0 && base[0] && typeof base[0].content === "string" ? (base[0].content as string) : "";
+        if (chosen !== sys) {
+          // eslint-disable-next-line no-console
+          console.warn("[guard] System-Prompt weicht ab (nicht 1:1)");
+        }
       }
 
       // Memory als 2. System-Nachricht injizieren + Budget grob kürzen
@@ -168,20 +178,20 @@ export default function ChatPanel() {
 
       let accum = "";
       await client.send({
-        model: settings.modelId!,
+        model: settings.modelId as string,
         messages,
         signal: ac.signal,
-        onToken: (delta) => {
+        onToken: (delta: string) => {
           accum += delta;
           setItems((prev) =>
             prev.map((b) => (b.id === asst.id ? { ...b, content: accum } : b))
           );
           if (shouldStickRef.current) {
             requestAnimationFrame(() => {
-              tailRef.current?.scrollIntoView({ block: "end" });
+              if (tailRef.current) tailRef.current.scrollIntoView({ block: "end" });
             });
           }
-        },
+        }
       });
 
       // Memory "gesehen"
@@ -189,10 +199,8 @@ export default function ChatPanel() {
         memory.touchAll();
       }
     } catch (e: any) {
-      const msg =
-        String(e?.name || "").toLowerCase() === "aborterror"
-          ? "⏹️ abgebrochen"
-          : "❌ " + String(e?.message ?? e);
+      const isAbort = String(e && e.name ? e.name : "").toLowerCase() === "aborterror";
+      const msg = isAbort ? "⏹️ abgebrochen" : "❌ " + String(e && e.message ? e.message : e);
       setItems((prev) =>
         prev.map((b) => (b.id === asst.id ? { ...b, content: b.content || msg } : b))
       );
@@ -240,6 +248,7 @@ export default function ChatPanel() {
           </div>
         ))}
 
+        {/* Anker zum Scrollen ans Ende */}
         <div ref={tailRef} aria-hidden="true" />
       </div>
 

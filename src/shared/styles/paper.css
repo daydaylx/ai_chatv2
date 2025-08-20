@@ -1,24 +1,20 @@
 /* ---------- PAPER THEME (ruhig, warm, papierartige Haptik) ---------- */
 
 :root {
-  /* Grundtöne – warmes Dark-Theme */
-  --paper-bg: hsl(220 14% 10%);        /* Hintergrund-Basiston (warm-grau) */
-  --paper-spot: hsla(35 80% 55% / 0.10); /* sehr sanfte warme Spots */
-  --paper-spot-2: hsla(260 70% 60% / 0.08); /* kühler Konter-Spot, sehr schwach */
+  --paper-bg: hsl(220 14% 10%);
+  --paper-spot: hsla(35 80% 55% / 0.10);
+  --paper-spot-2: hsla(260 70% 60% / 0.08);
 
   --paper-border: rgba(255,255,255,0.10);
-  --paper-fill: rgba(255,255,255,0.045);         /* Kartenhintergrund */
-  --paper-fill-strong: rgba(255,255,255,0.06);   /* stärkere Flächen (Sheets) */
+  --paper-fill: rgba(255,255,255,0.045);
+  --paper-fill-strong: rgba(255,255,255,0.06);
   --paper-inner: rgba(255,255,255,0.08);
 
   --paper-shadow: rgba(10, 10, 10, 0.55);
   --paper-ring: hsla(var(--accent-600-hsl, 255 90% 60%), 0.35);
-
-  /* Optional: leicht wärmere Schrift im Dark-Mode */
   --paper-ink: hsl(220 20% 93%);
 }
 
-/* Hintergrund-Layer: dezente Spots + „Papier“-Grain (keine Bilder, nur CSS) */
 .glass-bg {
   position: fixed;
   inset: 0;
@@ -37,14 +33,12 @@
   z-index: 0;
   opacity: .13;
   mix-blend-mode: soft-light;
-  /* „Papier“-Korn via zwei gekreuzten feinen Rastern */
   background-image:
     repeating-linear-gradient(0deg, rgba(255,255,255,0.025) 0 1px, transparent 1px 3px),
     repeating-linear-gradient(90deg, rgba(255,255,255,0.025) 0 1px, transparent 1px 3px);
   filter: contrast(110%) saturate(105%);
 }
 
-/* Karten/Sheets im Papier-Look: kein Blur, ruhige Flächen, weiche Schatten */
 .glass-card {
   background: var(--paper-fill);
   border: 1px solid var(--paper-border);
@@ -65,7 +59,6 @@
   color: var(--paper-ink);
 }
 
-/* Header-Leiste: leichte Glanzkante, kein Blur */
 .glass-header {
   background: linear-gradient(to bottom, rgba(255,255,255,0.035), rgba(255,255,255,0.02));
   border-bottom: 1px solid var(--paper-border);
@@ -73,7 +66,6 @@
   color: var(--paper-ink);
 }
 
-/* Chat-Bubbles: Assistant = Papierkarte, User = Akzent (entsättigt & etwas heller) */
 .bubble-assistant {
   background: var(--paper-fill);
   border: 1px solid var(--paper-border);
@@ -84,7 +76,6 @@
 }
 
 .bubble-user {
-  /* leicht entsättigte Akzentfläche, besser lesbar */
   background: color-mix(in oklab, hsl(var(--accent-600-hsl, 255 90% 60%)) 85%, white 15%);
   color: #0b0b0b;
   box-shadow:
@@ -93,7 +84,6 @@
   border: 1px solid hsla(var(--accent-600-hsl, 255 90% 60%), 0.45);
 }
 
-/* Fokus-/Hover-Ringe: dezent, papierkompatibel */
 .glow-ring {
   box-shadow:
     0 0 0 1px var(--paper-border),
@@ -113,7 +103,6 @@
     0 0 0 6px var(--paper-ring);
 }
 
-/* Pills/Badges: leichte Kapseln, papierhafter Hintergrund */
 .pill {
   border: 1px solid var(--paper-border);
   background: rgba(255,255,255,0.045);
@@ -124,10 +113,5 @@
   color: var(--paper-ink);
 }
 
-/* Utility: Lift (dezenter Hover) */
-.hover-lift {
-  transition: transform 160ms ease, box-shadow 160ms ease;
-}
-.hover-lift:hover {
-  transform: translateY(-1px);
-}
+.hover-lift { transition: transform 160ms ease, box-shadow 160ms ease; }
+.hover-lift:hover { transform: translateY(-1px); }

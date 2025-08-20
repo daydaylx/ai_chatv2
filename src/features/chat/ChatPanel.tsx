@@ -65,12 +65,11 @@ export default function ChatPanel() {
     // Initial
     computeStick();
 
-    // Reagieren auf Größenänderungen der Liste (Streaming / Images / Fonts)
+    // Reagieren auf Größenänderungen (Streaming / Fonts)
     const ro =
       typeof ResizeObserver !== "undefined"
         ? new ResizeObserver(() => {
             if (shouldStickRef.current) {
-              // ans Ende scrollen, aber nur wenn Nutzer "am Ende" war
               requestAnimationFrame(() => {
                 tailRef.current?.scrollIntoView({ block: "end" });
               });
@@ -123,9 +122,7 @@ export default function ChatPanel() {
         const brief = [
           ...(rule.allowedIds ?? []),
           ...(rule.allowedPatterns ?? []).map(function (p) { return "/" + p + "/"; }),
-        ]
-          .slice(0, 6)
-          .join(", ");
+        ].slice(0, 6).join(", ");
         toast.show(
           "Stil erfordert bestimmte Modelle. Erlaubt: " + (brief || "siehe Liste"),
           "error"
@@ -139,21 +136,11 @@ export default function ChatPanel() {
     const ac = new AbortController();
     abortRef.current = ac;
 
-    // Beim Senden immer ans Ende pinnen
+    // Beim Senden: ans Ende pinnen
     shouldStickRef.current = true;
 
-    const user: Bubble = {
-      id: uuid(),
-      role: "user",
-      content,
-      ts: Date.now(),
-    };
-    const asst: Bubble = {
-      id: uuid(),
-      role: "assistant",
-      content: "",
-      ts: Date.now(),
-    };
+    const user: Bubble = { id: uuid(), role: "user", content, ts: Date.now() };
+    const asst: Bubble = { id: uuid(), role: "assistant", content: "", ts: Date.now() };
     setItems((prev) => [...prev, user, asst]);
     setInput("");
 
@@ -169,18 +156,13 @@ export default function ChatPanel() {
       if (import.meta.env?.DEV) {
         const chosen = currentStyle?.system ?? "";
         const sys = (base.length > 0 ? base[0].content : "") ?? "";
-        if (chosen !== sys)
-          console.warn("[guard] System-Prompt weicht ab (nicht 1:1)");
+        if (chosen !== sys) console.warn("[guard] System-Prompt weicht ab (nicht 1:1)");
       }
 
       // Memory als 2. System-Nachricht injizieren + Budget grob kürzen
       const messages = injectMemory(
         base,
-        {
-          enabled: memory.enabled,
-          autoExtract: memory.autoExtract,
-          entries: memory.entries,
-        } as any,
+        { enabled: memory.enabled, autoExtract: memory.autoExtract, entries: memory.entries } as any,
         { maxChars: 12000 }
       );
 
@@ -258,7 +240,6 @@ export default function ChatPanel() {
           </div>
         ))}
 
-        {/* Anker zum Scrollen ans Ende */}
         <div ref={tailRef} aria-hidden="true" />
       </div>
 
@@ -266,4 +247,3 @@ export default function ChatPanel() {
     </div>
   );
 }
-```0

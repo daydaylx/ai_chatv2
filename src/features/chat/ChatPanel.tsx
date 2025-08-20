@@ -61,7 +61,7 @@ export default function ChatPanel() {
     // 1) Basis-Historie
     const fullHistory: ChatMsg[] = sess.messages.map((m) => ({ role: m.role, content: m.content }));
     const lastN: ChatMsg[] = fullHistory.slice(-KEEP_LAST_N);
-    const pending: ChatMsg[] = [...lastN, { role: "user", content: text }];
+    const pending: ChatMsg[] = [...lastN, { role: "user" as const, content: text }];
 
     // 2) Running-Summary (falls vorhanden)
     const runningSummary = await sess.getCurrentRunningSummary();
@@ -97,7 +97,11 @@ export default function ChatPanel() {
 
         // Auto-Summary: wirklich zur runningSummary verdichten + Prune
         try {
-          const histForCheck = [...fullHistory, { role: "user", content: text }, { role: "assistant", content: full }];
+          const histForCheck: ChatMsg[] = [
+            ...fullHistory,
+            { role: "user" as const, content: text },
+            { role: "assistant" as const, content: full },
+          ];
           if (settings.autoSummarize && shouldSummarize(histForCheck)) {
             const summary = await summarize({ apiKey, model: runModel, history: histForCheck });
             const combined = combineSummaries(runningSummary, summary);
@@ -106,17 +110,17 @@ export default function ChatPanel() {
             const removed = await sess.pruneMessages(KEEP_LAST_N);
             setCompressedNotice(`Kontext verdichtet (${removed} alte Nachrichten komprimiert).`);
           }
-        } catch (e) {
-          console.warn("summarize/runningSummary failed", e);
-        }
 
-        // Memory-Extraktion im Hintergrund (still)
-        try {
+          // Memory-Extraktion im Hintergrund (still)
           if (settings.autoMemory) {
-            await extractAndStoreMemory({ apiKey, model: runModel, history: histForCheckForMemory(fullHistory, text, full) });
+            await extractAndStoreMemory({
+              apiKey,
+              model: runModel,
+              history: histForCheckForMemory(fullHistory, text, full),
+            });
           }
         } catch (e) {
-          console.warn("memory extract failed", e);
+          console.warn("summarize/memory failed", e);
         }
       },
       onError: (err) => {
@@ -169,5 +173,9 @@ function combineSummaries(existing: string, s: { bullets: string[]; narrative: s
 }
 
 function histForCheckForMemory(fullHistory: ChatMsg[], user: string, assistant: string): ChatMsg[] {
-  return [...fullHistory, { role: "user", content: user }, { role: "assistant", content: assistant }];
+  return [
+    ...fullHistory,
+    { role: "user" as const, content: user },
+    { role: "assistant" as const, content: assistant },
+  ];
 }

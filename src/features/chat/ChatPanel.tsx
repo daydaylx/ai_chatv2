@@ -1,3 +1,4 @@
+// src/features/chat/ChatPanel.tsx
 import React from "react";
 import type { ChatMessage } from "../../lib/openrouter";
 import { useSettings } from "../../entities/settings/store";
@@ -7,21 +8,27 @@ import { MessageBubble } from "../../components/MessageBubble";
 import { ChatInput } from "../../components/ChatInput";
 import { useToast } from "../../shared/ui/Toast";
 import { SettingsContext } from "../../widgets/shell/AppShell";
-import { ScrollToEnd } from "../../components/ScrollToEnd";
 import { ruleForStyle, isModelAllowed } from "../../config/styleModelRules";
 import { useMemory } from "../../entities/memory/store";
 import { injectMemory } from "../../lib/memoryPipeline";
-import { extractFromChat } from "../memory/extract";
 
 type Bubble = ChatMessage & { id: string; ts: number };
-const uuid = () => (crypto as any)?.randomUUID?.() ?? `${Date.now()}-${Math.random().toString(36).slice(2,8)}`;
+
+const uuid = () =>
+  (crypto as any)?.randomUUID?.() ??
+  `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
 
 export default function ChatPanel() {
   const [items, setItems] = React.useState<Bubble[]>([]);
   const [input, setInput] = React.useState("");
   const [busy, setBusy] = React.useState(false);
-  const abortRef = React.useRef<AbortController|null>(null);
-  const listRef = React.useRef<HTMLDivElement|null>(null);
+
+  const abortRef = React.useRef<AbortController | null>(null);
+
+  // Scroll-Setup
+  const listRef = React.useRef<HTMLDivElement | null>(null);
+  const tailRef = React.useRef<HTMLDivElement | null>(null);
+  const shouldStickRef = React.useRef<boolean>(true); // am Ende kleben?
 
   const settings = useSettings();
   const persona = React.useContext(PersonaContext);
@@ -31,21 +38,68 @@ export default function ChatPanel() {
   const memory = useMemory();
 
   const currentStyle = React.useMemo(
-    () => persona.data.styles.find(x => x.id === (settings.personaId ?? "")) ?? null,
+    () =>
+      persona.data.styles.find(
+        (x) => x.id === (settings.personaId ?? "")
+      ) ?? null,
     [persona.data.styles, settings.personaId]
   );
-  const systemMsg = React.useMemo(() => getSystemFor(currentStyle ?? null), [currentStyle, getSystemFor]);
 
-  React.useEffect(() => { scrollToEnd(); }, [items.length]);
+  const systemMsg = React.useMemo(
+    () => getSystemFor(currentStyle ?? null),
+    [currentStyle, getSystemFor]
+  );
 
-  function scrollToEnd() {
+  // Scroll-Listener: aktualisiert shouldStickRef
+  React.useEffect(() => {
     const el = listRef.current;
     if (!el) return;
-    el.scrollTop = el.scrollHeight + 9999;
-  }
+
+    const computeStick = () => {
+      shouldStickRef.current =
+        el.scrollTop + el.clientHeight >= el.scrollHeight - 120;
+    };
+
+    const onScroll = () => computeStick();
+    el.addEventListener("scroll", onScroll, { passive: true });
+    // Initial
+    computeStick();
+
+    // Reagieren auf Größenänderungen der Liste (Streaming / Images / Fonts)
+    const ro =
+      typeof ResizeObserver !== "undefined"
+        ? new ResizeObserver(() => {
+            if (shouldStickRef.current) {
+              // ans Ende scrollen, aber nur wenn Nutzer "am Ende" war
+              requestAnimationFrame(() => {
+                tailRef.current?.scrollIntoView({ block: "end" });
+              });
+            }
+          })
+        : null;
+    ro?.observe(el);
+
+    return () => {
+      el.removeEventListener("scroll", onScroll);
+      ro?.disconnect();
+    };
+  }, []);
+
+  // Neue Nachrichten: nur autoscrollen, wenn shouldStickRef true
+  React.useEffect(() => {
+    if (!shouldStickRef.current) return;
+    requestAnimationFrame(() => {
+      tailRef.current?.scrollIntoView({ block: "end" });
+    });
+  }, [items.length]);
 
   async function send() {
-    if (busy) { try { abortRef.current?.abort(); } catch {} return; }
+    if (busy) {
+      try {
+        abortRef.current?.abort();
+      } catch {}
+      return;
+    }
 
     const content = input.trim();
     if (!content) return;
@@ -68,9 +122,14 @@ export default function ChatPanel() {
       if (!ok) {
         const brief = [
           ...(rule.allowedIds ?? []),
-          ...(rule.allowedPatterns ?? []).map(p => `/${p}/`)
-        ].slice(0, 6).join(", ");
-        toast.show(`Stil erfordert bestimmte Modelle. Erlaubt: ${brief || "siehe Liste"}`, "error");
+          ...(rule.allowedPatterns ?? []).map((p) => `/${p}/`),
+        ]
+          .slice(0, 6)
+          .join(", ");
+        toast.show(
+          `Stil erfordert bestimmte Modelle. Erlaubt: ${brief || "siehe Liste"}`,
+          "error"
+        );
         openSettings("model");
         return;
       }
@@ -80,60 +139,83 @@ export default function ChatPanel() {
     const ac = new AbortController();
     abortRef.current = ac;
 
-    const user: Bubble = { id: uuid(), role: "user", content, ts: Date.now() };
-    const asst: Bubble = { id: uuid(), role: "assistant", content: "", ts: Date.now() };
-    setItems(prev => [...prev, user, asst]);
+    // Beim Senden immer ans Ende pinnen
+    shouldStickRef.current = true;
+
+    const user: Bubble = {
+      id: uuid(),
+      role: "user",
+      content,
+      ts: Date.now(),
+    };
+    const asst: Bubble = {
+      id: uuid(),
+      role: "assistant",
+      content: "",
+      ts: Date.now(),
+    };
+    setItems((prev) => [...prev, user, asst]);
     setInput("");
 
-    let accum = "";
-
     try {
-      // Basismessages: Stil + History + aktuelle User-Nachricht
+      // Basis-Verlauf (Stil + History + aktuelle User-Nachricht)
       const base: ChatMessage[] = [
         systemMsg,
-        ...items.map(({role, content}) => ({role, content})),
-        { role: "user", content }
+        ...items.map(({ role, content }) => ({ role, content })),
+        { role: "user", content },
       ];
 
       // Dev-Guard: Stil 1:1
       if (import.meta.env?.DEV) {
         const chosen = currentStyle?.system ?? "";
-        const sys = base[0]?.content ?? "";
-        if (chosen !== sys) console.warn("[guard] System-Prompt weicht ab (nicht 1:1)");
+        const sys = base.at(0)?.content ?? "";
+        if (chosen !== sys)
+          console.warn("[guard] System-Prompt weicht ab (nicht 1:1)");
       }
 
-      // Memory injizieren (als 2. System-Nachricht) + Budget grob kürzen
-      const messages = injectMemory(base, { enabled: memory.enabled, autoExtract: memory.autoExtract, entries: memory.entries }, { maxChars: 12000 });
+      // Memory als 2. System-Nachricht injizieren + Budget grob kürzen
+      const messages = injectMemory(
+        base,
+        {
+          enabled: memory.enabled,
+          autoExtract: memory.autoExtract,
+          entries: memory.entries,
+        } as any,
+        { maxChars: 12000 }
+      );
 
+      let accum = "";
       await client.send({
         model: settings.modelId!,
         messages,
         signal: ac.signal,
         onToken: (delta) => {
           accum += delta;
-          setItems(prev => prev.map((b) => b.id === asst.id ? ({ ...b, content: accum }) : b));
-        }
+          setItems((prev) =>
+            prev.map((b) => (b.id === asst.id ? { ...b, content: accum } : b))
+          );
+          if (shouldStickRef.current) {
+            requestAnimationFrame(() => {
+              tailRef.current?.scrollIntoView({ block: "end" });
+            });
+          }
+        },
       });
-
-      // Nach dem Turn: Auto-Extraktion aus Chatturn
-      if (memory.enabled && memory.autoExtract) {
-        const candidates = extractFromChat(content, accum);
-        if (candidates.length) {
-          for (const c of candidates) memory.add(c.text, c.tags, { ttlDays: c.ttlDays ?? 90, confidence: c.confidence ?? 0.75 });
-          toast.show(`🧠 ${candidates.length} Kontextpunkt(e) gespeichert.`, "info");
-        }
-      }
 
       // Memory "gesehen"
       if (memory.enabled && memory.entries.length) {
         memory.touchAll();
       }
-
     } catch (e: any) {
-      const msg = String(e?.name || "").toLowerCase() === "aborterror"
-        ? "⏹️ abgebrochen"
-        : `❌ ${String(e?.message ?? e)}`;
-      setItems(prev => prev.map(b => b.id === asst.id ? ({ ...b, content: (b.content || msg) }) : b));
+      const msg =
+        String(e?.name || "").toLowerCase() === "aborterror"
+          ? "⏹️ abgebrochen"
+          : `❌ ${String(e?.message ?? e)}`;
+      setItems((prev) =>
+        prev.map((b) =>
+          b.id === items.at(-1)?.id ? { ...b, content: b.content || msg } : b
+        )
+      );
     } finally {
       setBusy(false);
       abortRef.current = null;
@@ -149,28 +231,41 @@ export default function ChatPanel() {
   }, [items]);
 
   return (
-    <div className="flex flex-col h-full">
-      <div ref={listRef} className="flex-1 overflow-auto px-3 py-4 space-y-3 overscroll-contain">
+    <div className="flex flex-col h-full min-h-0">
+      <div
+        ref={listRef}
+        className="flex-1 min-h-0 overflow-auto px-3 py-4 space-y-3 overscroll-contain"
+      >
         {items.length === 0 && (
           <div className="mx-auto mt-16 max-w-md text-center opacity-70">
-            <div className="text-sm">Starte, indem du <b>API-Key</b>, <b>Modell</b> und <b>Stil</b> wählst.</div>
-            <div className="text-xs mt-2">Der Stil wird als unveränderte System-Nachricht gesendet.</div>
+            <div className="text-sm">
+              Starte, indem du <b>API-Key</b>, <b>Modell</b> und <b>Stil</b> wählst.
+            </div>
+            <div className="text-xs mt-2">
+              Der Stil wird als unveränderte System-Nachricht gesendet.
+            </div>
           </div>
         )}
+
         {items.map((it) => (
           <div
             key={it.id}
             className="flex"
             role="listitem"
-            {...(it.id === lastAssistantId ? { "aria-live": "polite" as const, "aria-atomic": true } : {})}
+            {...(it.id === lastAssistantId
+              ? ({ "aria-live": "polite", "aria-atomic": true } as const)
+              : {})}
           >
             <MessageBubble role={it.role}>{it.content || " "}</MessageBubble>
           </div>
         ))}
+
+        {/* Anker zum Scrollen ans Ende */}
+        <div ref={tailRef} aria-hidden="true" />
       </div>
 
-      <ScrollToEnd target={listRef} />
       <ChatInput value={input} onChange={setInput} onSend={send} busy={busy} />
     </div>
   );
 }
+```0

@@ -1,0 +1,135 @@
+import { create } from "zustand";
+import { nanoid } from "../util/nanoid";
+import {
+  type SessionMeta,
+  type Message,
+  putSession,
+  listSessions,
+  getSession,
+  addMessage,
+  listMessagesBySession,
+} from "./db";
+
+export type SessionState = {
+  currentId: string | null;
+  sessions: SessionMeta[];
+  messages: Message[]; // der aktiven Session
+  loading: boolean;
+
+  loadInitial: () => Promise<void>;
+  newSession: () => Promise<void>;
+  switchSession: (id: string) => Promise<void>;
+  removeSession: (id: string) => Promise<void>;
+
+  appendUser: (content: string) => Promise<Message>;
+  appendAssistant: (content: string) => Promise<Message>;
+  updateTitleFromFirstUser: () => Promise<void>;
+};
+
+export const useSession = create<SessionState>((set, get) => ({
+  currentId: null,
+  sessions: [],
+  messages: [],
+  loading: false,
+
+  loadInitial: async () => {
+    set({ loading: true });
+    const list = await listSessions();
+    if (!list.length) {
+      const id = nanoid();
+      const now = Date.now();
+      const meta: SessionMeta = { id, title: "Neue Session", createdAt: now, updatedAt: now };
+      await putSession(meta);
+      set({ currentId: id, sessions: [meta], messages: [], loading: false });
+      return;
+    }
+    const cur = list[0];
+    const msgs = await listMessagesBySession(cur.id);
+    set({ currentId: cur.id, sessions: list, messages: msgs, loading: false });
+  },
+
+  newSession: async () => {
+    const id = nanoid();
+    const now = Date.now();
+    const meta: SessionMeta = { id, title: "Neue Session", createdAt: now, updatedAt: now };
+    await putSession(meta);
+    const list = await listSessions();
+    set({ currentId: id, sessions: list, messages: [] });
+  },
+
+  switchSession: async (id: string) => {
+    const meta = await getSession(id);
+    if (!meta) return;
+    const msgs = await listMessagesBySession(id);
+    set({ currentId: id, messages: msgs });
+  },
+
+  removeSession: async (_id: string) => {
+    console.warn("removeSession: not implemented in Phase 2");
+  },
+
+  appendUser: async (content: string) => {
+    const id = get().currentId ?? nanoid();
+    if (!get().currentId) {
+      const now = Date.now();
+      const meta: SessionMeta = { id, title: "Neue Session", createdAt: now, updatedAt: now };
+      await putSession(meta);
+      set({ currentId: id, sessions: await listSessions(), messages: [] });
+    }
+    const msg: Message = {
+      id: nanoid(),
+      sessionId: id,
+      role: "user",
+      content,
+      createdAt: Date.now(),
+    };
+    await addMessage(msg);
+    const msgs = [...get().messages, msg];
+    set({ messages: msgs });
+    return msg;
+  },
+
+  appendAssistant: async (content: string) => {
+    const id = get().currentId!;
+    const msg: Message = {
+      id: nanoid(),
+      sessionId: id,
+      role: "assistant",
+      content,
+      createdAt: Date.now(),
+    };
+    await addMessage(msg);
+    const msgs = [...get().messages, msg];
+    set({ messages: msgs });
+    const s = await getSession(id);
+    if (s) {
+      s.updatedAt = Date.now();
+      if (s.title === "Neue Session") {
+        s.title = makeTitleFromConversation(msgs);
+      }
+      await putSession(s);
+      set({ sessions: await listSessions() });
+    }
+    return msg;
+  },
+
+  updateTitleFromFirstUser: async () => {
+    const id = get().currentId;
+    if (!id) return;
+    const s = await getSession(id);
+    if (!s) return;
+    const firstUser = get().messages.find(m => m.role === "user");
+    if (firstUser) {
+      s.title = firstUser.content.slice(0, 40).replace(/\s+/g, " ").trim();
+      await putSession(s);
+      set({ sessions: await listSessions() });
+    }
+  },
+}));
+
+function makeTitleFromConversation(msgs: Message[]): string {
+  const firstUser = msgs.find(m => m.role === "user");
+  if (!firstUser) return "Session";
+  const t = firstUser.content.replace(/\s+/g, " ").trim();
+  return t.length > 40 ? t.slice(0, 40) + "…" : t;
+}

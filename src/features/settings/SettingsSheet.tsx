@@ -89,13 +89,42 @@ export default function SettingsSheet({ open, onOpenChange }: Props) {
           </section>
         </Tab>
 
+        <Tab title="Assistent">
+          <section className="grid gap-3">
+            <label className="flex items-center justify-between gap-3">
+              <div>
+                <div className="text-sm font-medium">Kontext automatisch zusammenfassen</div>
+                <div className="text-xs text-white/70">Ab ~20 Nachrichten oder ~4 k Zeichen wird eine Kurzfassung erstellt.</div>
+              </div>
+              <Switch checked={settings.autoSummarize} onCheckedChange={settings.setAutoSummarize} />
+            </label>
+
+            <label className="flex items-center justify-between gap-3">
+              <div>
+                <div className="text-sm font-medium">Memory aktivieren</div>
+                <div className="text-xs text-white/70">Extrahiert langlebige Präferenzen/Fakten in regelmäßigen Abständen.</div>
+              </div>
+              <Switch checked={settings.autoMemory} onCheckedChange={settings.setAutoMemory} />
+            </label>
+
+            <div className="grid gap-1">
+              <div className="text-sm font-medium">Summarizer-Modell (optional)</div>
+              <Input
+                placeholder="z. B. mistral-small oder llama-3.1-8b"
+                value={settings.summarizerModelId ?? ""}
+                onChange={(e) => settings.setSummarizerModelId(e.target.value || null)}
+                aria-label="Summarizer-Modell"
+              />
+              <div className="text-xs text-white/60">Leer lassen, um das Hauptmodell zu verwenden.</div>
+            </div>
+          </section>
+        </Tab>
+
         <Tab title="Design">
           <h3 className="text-sm font-semibold mb-2">Akzentfarbe</h3>
           <div className="flex gap-2 flex-wrap">
             {(["violet","amber","jade","blue"] as Accent[]).map(a => (
-              <button key={a} onClick={() => changeAccent(a)} className={["h-9 px-3 rounded-full border border-white/12 text-sm", a===accent ? "bg-[hsl(var(--accent-600))]/20 ring-2 ring-[hsl(var(--accent-600))]" : "hover:bg-white/6"].join(" ")}>
-                {a}
-              </button>
+              <button key={a} onClick={() => changeAccent(a)} className={["h-9 px-3 rounded-full border border-white/12 text-sm", a===accent ? "bg-[hsl(var(--accent-600))]/20 ring-2 ring-[hsl(var(--accent-600))]" : "hover:bg-white/6"].join(" ")}>{a}</button>
             ))}
           </div>
         </Tab>
@@ -104,7 +133,7 @@ export default function SettingsSheet({ open, onOpenChange }: Props) {
   );
 }
 
-/** Minimaler Tabs-Wrapper, um das Sheet übersichtlich zu halten */
+/** Minimaler Tabs-Wrapper */
 function Tabs({ children }: { children: React.ReactNode }) {
   const [i, setI] = React.useState(0);
   const items = React.Children.toArray(children) as React.ReactElement[];

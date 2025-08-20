@@ -1,108 +1,131 @@
-import { useEffect, useMemo, useState } from "react";
-import clsx from "clsx";
-// Deine bestehende personas.json – NICHT ändern:
-import raw from "../../data/personas.json";
+import * as React from "react";
+import personasRaw from "../../data/personas.json";
 
 type Persona = {
   id: string;
-  name: string;
+  label?: string;
+  name?: string;           // Fallback
   description?: string;
   allow?: string[];
   deny?: string[];
-  // weitere Felder bleiben unbeachtet
+  system?: string;
 };
 
 type Props = {
-  /** Aktuell ausgewählte Persona-ID */
-  value: string;
-  /** Auswahländerung */
-  onChange: (id: string) => void;
-  /** Optional: Suchfeld anzeigen (default true) */
+  selectedId?: string;
+  onSelect: (id: string) => void;
   showSearch?: boolean;
+  compact?: boolean;
 };
 
-function extractPersonas(anyRaw: any): Persona[] {
-  // Unterstützt:
-  //  A) Array mit Persona-Objekten
-  if (Array.isArray(anyRaw)) {
-    return anyRaw.filter((p) => p && p.id && p.name);
-  }
-  //  B) Objekt mit { personas: [...] }
-  if (anyRaw && typeof anyRaw === "object" && Array.isArray(anyRaw.personas)) {
-    return anyRaw.personas.filter((p: any) => p && p.id && p.name);
-  }
-  return [];
+function normalize(p: any): Persona {
+  return {
+    id: String(p?.id ?? "").trim(),
+    label: typeof p?.label === "string" ? p.label.trim() : undefined,
+    name: typeof p?.name === "string" ? p.name.trim() : undefined,
+    description: typeof p?.description === "string" ? p.description.trim() : undefined,
+    allow: Array.isArray(p?.allow) ? p.allow.filter(Boolean) : undefined,
+    deny: Array.isArray(p?.deny) ? p.deny.filter(Boolean) : undefined,
+    system: typeof p?.system === "string" ? p.system : undefined,
+  };
+}
+function titleOf(p: Persona) {
+  return p.label?.trim() || p.name?.trim() || p.id;
+}
+function subtitleOf(p: Persona) {
+  return p.description || "";
 }
 
-export default function PersonaPicker({ value, onChange, showSearch = true }: Props) {
-  const personas = useMemo<Persona[]>(() => extractPersonas(raw), []);
-  const [search, setSearch] = useState("");
+export default function PersonaPicker({
+  selectedId,
+  onSelect,
+  showSearch = true,
+  compact = false,
+}: Props) {
+  const personas: Persona[] = React.useMemo(
+    () => (Array.isArray(personasRaw) ? personasRaw.map(normalize).filter(x => x.id) : []),
+    []
+  );
+  const [q, setQ] = React.useState("");
 
-  // Wenn value ungültig, auf erste Persona setzen
-  useEffect(() => {
-    if (!personas.length) return;
-    const firstPersona = personas[0];
-    if (!value || !personas.some((p) => p.id === value)) {
-      if (firstPersona) {
-        onChange(firstPersona.id);
-      }
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [personas, value]);
-
-  const filtered = useMemo(() => {
-    if (!showSearch) return personas;
-    const q = search.trim().toLowerCase();
-    if (!q) return personas;
-    return personas.filter(
-      (p) =>
-        p.name.toLowerCase().includes(q) ||
-        (p.description || "").toLowerCase().includes(q) ||
-        p.id.toLowerCase().includes(q)
+  const filtered = React.useMemo(() => {
+    if (!q.trim()) return personas;
+    const s = q.trim().toLowerCase();
+    return personas.filter(p =>
+      titleOf(p).toLowerCase().includes(s) ||
+      subtitleOf(p).toLowerCase().includes(s) ||
+      p.id.toLowerCase().includes(s)
     );
-  }, [personas, search, showSearch]);
+  }, [q, personas]);
 
   return (
     <div className="space-y-3">
-      {showSearch && (
+      {showSearch ? (
         <input
-          type="text"
-          placeholder="Stil suchen…"
-          className="w-full px-4 py-3 rounded-lg text-sm bg-secondary/50 border border-border/50 focus:outline-none focus:ring-2 focus:ring-primary/40 focus:border-primary/40"
-          value={search}
-          onChange={(e) => setSearch(e.target.value)}
-          aria-label="Stile durchsuchen"
+          type="search"
+          value={q}
+          onChange={(e) => setQ(e.target.value)}
+          placeholder="Personas durchsuchen…"
+          className={[
+            "w-full rounded-xl",
+            "bg-white/[0.06] border border-white/12",
+            "px-3", compact ? "h-9 text-sm" : "h-11 text-base",
+            "placeholder:text-white/60 text-white",
+            "focus:outline-none focus:ring-2 focus:ring-[hsl(var(--accent-600))]",
+          ].join(" ")}
         />
-      )}
+      ) : null}
 
-      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+      <div className="flex flex-col gap-2">
         {filtered.map((p) => {
-          const active = p.id === value;
+          const selected = p.id === selectedId;
+          const title = titleOf(p);
+          const sub = subtitleOf(p);
+
           return (
             <button
               key={p.id}
-              onClick={() => onChange(p.id)}
-              className={clsx(
-                "text-left p-4 rounded-xl border transition-all",
-                active
-                  ? "bg-primary/20 border-primary/50 ring-2 ring-primary/30"
-                  : "bg-secondary/30 border-border/50 hover:bg-secondary/50"
-              )}
-              aria-pressed={active}
-              aria-label={`Persona ${p.name} auswählen`}
+              type="button"
+              onClick={() => onSelect(p.id)}
+              aria-pressed={selected}
+              title={sub ? `${title}\n${sub}` : title}
+              className={[
+                "w-full text-left rounded-xl transition-colors",
+                compact ? "min-h-[44px] p-2" : "min-h-[52px] p-3",
+                selected
+                  ? "bg-[hsl(var(--accent-600))]/15 ring-2 ring-[hsl(var(--accent-600))]"
+                  : "bg-white/[0.04] hover:bg-white/[0.07] border border-white/10",
+              ].join(" ")}
             >
-              <div className="font-semibold text-base">{p.name}</div>
-              {p.description && (
-                <div className="text-sm text-muted-foreground mt-1">{p.description}</div>
-              )}
+              <div className="flex items-center gap-3 min-w-0">
+                <div
+                  className={[
+                    "shrink-0 rounded-md",
+                    compact ? "h-6 w-6" : "h-7 w-7",
+                    selected ? "bg-[hsl(var(--accent-600))]" : "bg-white/15",
+                  ].join(" ")}
+                  aria-hidden
+                />
+                <div className="flex-1 min-w-0">
+                  <div className={["font-medium truncate", compact ? "text-[13px]" : "text-sm"].join(" ")}>
+                    {title}
+                  </div>
+                  {sub ? (
+                    <div className={["text-muted-foreground truncate", compact ? "text-[11px]" : "text-xs"].join(" ")}>
+                      {sub}
+                    </div>
+                  ) : null}
+                </div>
+                {selected ? (
+                  <span className="shrink-0 text-[12px] px-2 py-0.5 rounded bg-[hsl(var(--accent-600))]/20">
+                    aktiv
+                  </span>
+                ) : null}
+              </div>
             </button>
           );
         })}
       </div>
-
-      {filtered.length === 0 && (
-        <div className="text-sm text-muted-foreground">Keine passenden Stile gefunden.</div>
-      )}
     </div>
   );
 }

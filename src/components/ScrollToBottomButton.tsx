@@ -1,11 +1,16 @@
-import React from "react";
+import * as React from "react";
 import Button from "../shared/ui/Button";
 
-export default function ScrollToBottomButton({ onClick, visible }: { onClick: ()=>void; visible: boolean }) {
-  if (!visible) return null;
+type Props = {
+  onClick: () => void;
+};
+
+export default function ScrollToBottomButton({ onClick }: Props) {
   return (
-    <div className="fixed right-3 bottom-[88px]">
-      <Button variant="solid" size="icon" onClick={onClick} aria-label="Zum Ende scrollen">↓</Button>
+    <div className="fixed right-3 bottom-16 sm:bottom-6 z-40 drop-shadow">
+      <Button variant="solid" size="icon" onClick={onClick} aria-label="Zum Ende scrollen">
+        ↓
+      </Button>
     </div>
   );
 }

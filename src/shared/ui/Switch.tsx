@@ -1,28 +1,24 @@
-import React from "react";
+import * as React from "react";
 
-type Props = {
-  checked: boolean;
-  onCheckedChange: (v: boolean) => void;
-  label?: string;
-  id?: string;
-};
-
-export function Switch({ checked, onCheckedChange, label, id }: Props) {
-  const switchId = id ?? `sw-${Math.random().toString(36).slice(2,8)}`;
+type Props = { checked: boolean; onCheckedChange: (v: boolean) => void; };
+export default function Switch({ checked, onCheckedChange }: Props) {
   return (
-    <label htmlFor={switchId} className="inline-flex items-center gap-3 cursor-pointer select-none">
-      <span className="relative inline-flex items-center">
-        <input
-          id={switchId}
-          type="checkbox"
-          className="peer sr-only"
-          checked={checked}
-          onChange={(e)=>onCheckedChange(e.target.checked)}
-        />
-        <span className="w-11 h-6 rounded-full bg-white/15 transition peer-checked:bg-accent/60" />
-        <span className="absolute left-0 top-0 h-6 w-6 rounded-full bg-white shadow transition peer-checked:translate-x-5" />
-      </span>
-      {label ? <span className="text-sm opacity-80">{label}</span> : null}
-    </label>
+    <button
+      type="button"
+      role="switch"
+      aria-checked={checked}
+      onClick={() => onCheckedChange(!checked)}
+      className={[
+        "h-6 w-11 rounded-full relative transition",
+        checked ? "bg-[hsl(var(--accent-600))]" : "bg-white/20",
+      ].join(" ")}
+    >
+      <span
+        className={[
+          "absolute top-0.5 h-5 w-5 rounded-full bg-white transition",
+          checked ? "left-[26px]" : "left-0.5",
+        ].join(" ")}
+      />
+    </button>
   );
 }

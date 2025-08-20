@@ -1,6 +1,5 @@
-import React from "react";
-import { cn } from "../../shared/lib/cn";
-
-export function Badge({ children, className }: React.HTMLAttributes<HTMLSpanElement>) {
-  return <span className={cn("inline-flex items-center rounded-full border border-white/15 px-2.5 py-1 text-xs opacity-90", className)}>{children}</span>;
+import * as React from "react";
+export function Badge({ children }: { children: React.ReactNode }) {
+  return <span className="text-[10px] leading-4 px-1.5 py-0.5 rounded bg-white/10 text-white/90">{children}</span>;
 }
+export default Badge;

@@ -1,98 +1,29 @@
 import { create } from "zustand";
 
-/**
- * Wichtig:
- * - Tests erwarten: modelId default = null, personaId default = "neutral"
- * - Setter mutieren die gleiche Objekt-Referenz (getState() bleibt stabil)
- * - Persistenz: localStorage
- */
+type Favorites = Record<string, true>;
 
 export type SettingsState = {
   modelId: string | null;
-  personaId: string | null;
-  favorites: Record<string, true>;
+  favorites: Favorites;
   setModelId: (id: string | null) => void;
-  setPersonaId: (id: string | null) => void;
-  toggleFavorite: (modelId: string) => void;
-  reset: () => void;
+  toggleFavorite: (id: string) => void;
 };
 
-const KEY_MODEL = "settings:modelId";
-const KEY_PERSONA = "settings:personaId";
-const KEY_FAVS = "settings:favorites";
+const LS_MODEL = "settings.modelId";
+const LS_FAVS = "settings.favorites";
 
-function readLS(key: string): string | null {
-  try {
-    if (typeof window === "undefined" || !("localStorage" in window)) return null;
-    const v = window.localStorage.getItem(key);
-    return v && v.length ? v : null;
-  } catch { return null; }
-}
-function writeLS(key: string, v: string | null) {
-  try {
-    if (typeof window === "undefined" || !("localStorage" in window)) return;
-    if (v === null || v === "") window.localStorage.removeItem(key);
-    else window.localStorage.setItem(key, v);
-  } catch { void 0; }
-}
-
-function readJSON<T>(key: string, fallback: T): T {
-  try {
-    if (typeof window === "undefined" || !("localStorage" in window)) return fallback;
-    const raw = window.localStorage.getItem(key);
-    if (!raw) return fallback;
-    const obj = JSON.parse(raw);
-    return (obj && typeof obj === "object") ? obj as T : fallback;
-  } catch { return fallback; }
-}
-function writeJSON(key: string, obj: any) {
-  try {
-    if (typeof window === "undefined" || !("localStorage" in window)) return;
-    window.localStorage.setItem(key, JSON.stringify(obj));
-  } catch { void 0; }
-}
-
-// Defaults laut Tests
-const initialModel = readLS(KEY_MODEL);
-const initialPersona = readLS(KEY_PERSONA) ?? "neutral";
-const initialFavs = readJSON<Record<string, true>>(KEY_FAVS, {});
+function read(key: string): string | null { try { return localStorage.getItem(key); } catch { return null; } }
+function write(key: string, v: string | null) { try { v==null?localStorage.removeItem(key):localStorage.setItem(key,v);} catch{} }
 
 export const useSettings = create<SettingsState>((set, get) => ({
-  modelId: initialModel ?? null,
-  personaId: initialPersona,
-  favorites: initialFavs,
-
-  setModelId: (id) => {
-    const state = get();
-    state.modelId = id ?? null;
-    writeLS(KEY_MODEL, id ?? null);
-    // Zustand verlangt ein neues Objekt – aber Tests wollen Reuse der Referenz:
-    set(state, true);
-  },
-  setPersonaId: (id) => {
-    const state = get();
-    state.personaId = (id ?? null);
-    writeLS(KEY_PERSONA, id ?? null);
-    set(state, true);
-  },
-  toggleFavorite: (mid) => {
-    const state = get();
-    if (!state.favorites) state.favorites = {};
-    if (state.favorites[mid]) delete state.favorites[mid];
-    else state.favorites[mid] = true;
-    writeJSON(KEY_FAVS, state.favorites);
-    set(state, true);
-  },
-  reset: () => {
-    const state = get();
-    state.modelId = null;
-    state.personaId = null;
-    state.favorites = {};
-    writeLS(KEY_MODEL, null);
-    writeLS(KEY_PERSONA, null);
-    writeJSON(KEY_FAVS, {});
-    set(state, true);
+  modelId: read(LS_MODEL),
+  favorites: (() => {
+    try { return JSON.parse(read(LS_FAVS) || "{}") as Favorites; } catch { return {}; }
+  })(),
+  setModelId: (id) => { set({ modelId: id }); write(LS_MODEL, id); },
+  toggleFavorite: (id) => {
+    const f = { ...get().favorites };
+    if (f[id]) delete f[id]; else f[id] = true;
+    set({ favorites: f }); write(LS_FAVS, JSON.stringify(f));
   },
 }));
-
-export default useSettings;

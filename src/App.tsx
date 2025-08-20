@@ -1,11 +1,6 @@
-/**
- * Was & Warum:
- * App.tsx ist jetzt nur noch Orchestrierung: PersonaProvider kapselt das Laden/Validieren.
- * Der sichtbare Aufbau (ClientProvider -> AppShell -> ChatPanel) bleibt unverändert.
- */
-import React from "react";
-import ChatPanel from "./features/chat/ChatPanel";
+import * as React from "react";
 import { AppShell } from "./widgets/shell/AppShell";
+import ChatPanel from "./features/chat/ChatPanel";
 import { ClientProvider } from "./lib/client";
 import { PersonaProvider } from "./entities/PersonaProvider";
 

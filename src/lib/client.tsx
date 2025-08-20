@@ -1,37 +1,24 @@
-import React, { createContext, useState } from "react";
-import { OpenRouterClient, SendOptions } from "./openrouter";
+import * as React from "react";
 
-interface ClientCtx {
-  apiKey: string | null;
-  setApiKey: (key: string | null) => void;
-  client: { send: (o: Omit<SendOptions, "apiKey">) => Promise<string> };
-}
+type ClientCtx = { apiKey: string | null; setApiKey: (k: string | null) => void; };
+const LS_KEY = "openrouter.apiKey";
 
-export const ClientContext = createContext<ClientCtx | null>(null);
+export const ClientContext = React.createContext<ClientCtx>({ apiKey: null, setApiKey: () => {} });
 
 export function ClientProvider({ children }: { children: React.ReactNode }) {
-  const [apiKey, setKey] = useState<string | null>(null);
-  const client = new OpenRouterClient(apiKey ? { apiKey } : { apiKey: "" });
+  const [apiKey, setApiKeyState] = React.useState<string | null>(null);
 
-  return (
-    <ClientContext.Provider
-      value={{
-        apiKey,
-        setApiKey: setKey,
-        client: {
-          send: async (o: Omit<SendOptions, "apiKey">) => {
-            return await client.send(o); // ✅ string zurückgeben
-          },
-        },
-      }}
-    >
-      {children}
-    </ClientContext.Provider>
-  );
+  React.useEffect(() => {
+    try { const v = localStorage.getItem(LS_KEY); if (v) setApiKeyState(v); } catch {}
+  }, []);
+
+  const setApiKey = (k: string | null) => {
+    setApiKeyState(k);
+    try { if (!k) localStorage.removeItem(LS_KEY); else localStorage.setItem(LS_KEY, k); } catch {}
+  };
+
+  const ctx = React.useMemo<ClientCtx>(() => ({ apiKey, setApiKey }), [apiKey]);
+  return <ClientContext.Provider value={ctx}>{children}</ClientContext.Provider>;
 }
 
-export function useClient() {
-  const ctx = React.useContext(ClientContext);
-  if (!ctx) throw new Error("ClientContext not found");
-  return ctx;
-}
+export function useClient() { return React.useContext(ClientContext); }

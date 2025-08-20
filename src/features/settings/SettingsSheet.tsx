@@ -13,9 +13,9 @@ import StylePicker from "../styles/StylePicker";
 import { getAccent, setAccent, type Accent } from "../../shared/lib/theme";
 import { ruleForStyle, isModelAllowed } from "../../config/styleModelRules";
 
-type Props = { open: boolean; onOpenChange: (v: boolean) => void; };
+type Props = { open: boolean; onOpenChange: (v: boolean) => void; className?: string; };
 
-export default function SettingsSheet({ open, onOpenChange }: Props) {
+export default function SettingsSheet({ open, onOpenChange, className }: Props) {
   const { data } = React.useContext(PersonaContext);
   const settings = useSettings();
   const { apiKey, setApiKey } = useClient();
@@ -34,7 +34,6 @@ export default function SettingsSheet({ open, onOpenChange }: Props) {
       if (fFree && !m.free) return false;
       if (fNSFW && !m.allow_nsfw) return false;
       if (fFast && !m.fast) return false;
-      // Stil-Regel anwenden
       if (!isModelAllowed(rule, m.id, m.name ?? m.description ?? undefined)) return false;
       return true;
     });
@@ -57,15 +56,15 @@ export default function SettingsSheet({ open, onOpenChange }: Props) {
   );
 
   return (
-    <Sheet open={open} onOpenChange={onOpenChange} title="Einstellungen">
+    <Sheet open={open} onOpenChange={onOpenChange} title="Einstellungen" className={["glass-sheet", className ?? ""].join(" ")}>
       <Tabs>
         <Tab title="Modelle">
           <section className="grid gap-2">
             <h3 className="text-sm font-semibold">OpenRouter API-Key</h3>
             <div className="flex gap-2 items-center">
               <Input placeholder="sk-or-v1-..." value={apiKey ?? ""} onChange={(e) => setApiKey(e.target.value || null)} aria-label="API-Key" />
-              <Button variant="outline" onClick={() => catalog.refresh()} aria-label="Neu laden">Neu laden</Button>
-              <Button variant="outline" onClick={() => setApiKey(null)} aria-label="Löschen">Löschen</Button>
+              <Button variant="outline" onClick={() => catalog.refresh()} aria-label="Neu laden" className="glow-ring">Neu laden</Button>
+              <Button variant="outline" onClick={() => setApiKey(null)} aria-label="Löschen" className="glow-ring">Löschen</Button>
             </div>
             <div className="text-xs text-white/70">
               {catalog.loading ? (<span className="inline-flex items-center gap-2"><Spinner/> Modelle laden…</span>)
@@ -113,14 +112,14 @@ export default function SettingsSheet({ open, onOpenChange }: Props) {
 
             <div className="grid gap-2">
               <h3 className="text-sm font-semibold">System-Prompt (Vorschau)</h3>
-              <div className="rounded-xl border border-white/12 bg-white/[0.04] p-3 max-h-52 overflow-auto text-[13px] leading-5 whitespace-pre-wrap">
+              <div className="rounded-xl border border-white/12 bg-white/[0.04] p-3 max-h-52 overflow-auto text-[13px] leading-5 whitespace-pre-wrap glass-card">
                 {currentStyle?.system ?? "Kein Stil ausgewählt. Standard-Neutral wird genutzt."}
               </div>
               <div className="text-xs text-white/60">Dieser Text wird als <code>system</code>-Nachricht vor jede Konversation gesetzt.</div>
             </div>
 
             <div className="grid gap-3">
-              <label className="flex items-center justify-between gap-3">
+              <label className="flex items-center justify-between gap-3 glass-card p-3">
                 <div>
                   <div className="text-sm font-medium">Kontext automatisch zusammenfassen</div>
                   <div className="text-xs text-white/70">Ab ~20 Nachrichten oder ~4 k Zeichen wird eine Kurzfassung erstellt.</div>
@@ -128,7 +127,7 @@ export default function SettingsSheet({ open, onOpenChange }: Props) {
                 <Switch checked={settings.autoSummarize} onCheckedChange={settings.setAutoSummarize} />
               </label>
 
-              <label className="flex items-center justify-between gap-3">
+              <label className="flex items-center justify-between gap-3 glass-card p-3">
                 <div>
                   <div className="text-sm font-medium">Memory aktivieren</div>
                   <div className="text-xs text-white/70">Extrahiert langlebige Präferenzen/Fakten in regelmäßigen Abständen.</div>
@@ -154,7 +153,7 @@ export default function SettingsSheet({ open, onOpenChange }: Props) {
           <h3 className="text-sm font-semibold mb-2">Akzentfarbe</h3>
           <div className="flex gap-2 flex-wrap">
             {(["violet","amber","jade","blue"] as Accent[]).map(a => (
-              <button key={a} onClick={() => changeAccent(a)} className={["h-9 px-3 rounded-full border border-white/12 text-sm", a===accent ? "bg-[hsl(var(--accent-600))]/20 ring-2 ring-[hsl(var(--accent-600))]" : "hover:bg-white/6"].join(" ")}>{a}</button>
+              <button key={a} onClick={() => changeAccent(a)} className={["h-9 px-3 rounded-full border border-white/12 text-sm glow-ring", a===accent ? "bg-[hsl(var(--accent-600))]/20 ring-2 ring-[hsl(var(--accent-600))]" : "hover:bg-white/6"].join(" ")}>{a}</button>
             ))}
           </div>
         </Tab>
@@ -171,7 +170,7 @@ function Tabs({ children }: { children: React.ReactNode }) {
     <div className="grid gap-3">
       <div className="flex gap-2">
         {items.map((it, idx) => (
-          <button key={idx} onClick={() => setI(idx)} className={["h-9 px-3 rounded-full border border-white/12 text-sm", idx===i ? "bg-[hsl(var(--accent-600))]/20 ring-2 ring-[hsl(var(--accent-600))]" : "hover:bg-white/6"].join(" ")}>{it.props.title}</button>
+          <button key={idx} onClick={() => setI(idx)} className={["h-9 px-3 rounded-full border border-white/12 text-sm glow-ring", idx===i ? "bg-[hsl(var(--accent-600))]/20 ring-2 ring-[hsl(var(--accent-600))]" : "hover:bg-white/6"].join(" ")}>{it.props.title}</button>
         ))}
       </div>
       <div>{items[i]}</div>

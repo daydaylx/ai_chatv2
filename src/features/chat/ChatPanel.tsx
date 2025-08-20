@@ -137,12 +137,18 @@ export default function ChatPanel() {
 
   return (
     <div className="flex flex-col gap-3">
-      <div className="flex-1 overflow-auto p-3 space-y-2 rounded-xl bg-white/[0.03] border border-white/10 max-h-[65svh]">
+      <div className="flex-1 overflow-auto p-3 space-y-2 rounded-xl border border-white/10 max-h-[65svh] glass-card">
         {compressedNotice ? (
-          <div className="mx-auto text-xs text-white/70 text-center pb-1">{compressedNotice}</div>
+          <div className="mx-auto text-xs text-white/70 text-center pb-1 pill"> {compressedNotice} </div>
         ) : null}
         {view.map((m) => (
-          <div key={m.id} className={["max-w-[85%] px-3 py-2 rounded-lg", m.role === "user" ? "ml-auto bg-[hsl(var(--accent-600))] text-black" : "mr-auto bg-white/[0.08] text-white"].join(" ")}>
+          <div
+            key={m.id}
+            className={[
+              "max-w-[85%] px-3 py-2 rounded-lg",
+              m.role === "user" ? "ml-auto bubble-user" : "mr-auto bubble-assistant",
+            ].join(" ")}
+          >
             <div className="whitespace-pre-wrap text-[15px] leading-normal">{m.content}</div>
           </div>
         ))}
@@ -153,10 +159,15 @@ export default function ChatPanel() {
           </div>
         ) : null}
         {!streaming && memoryUsed > 0 ? (
-          <div className="mr-auto text-[11px] text-white/60">Memory genutzt: {memoryUsed} Einträge</div>
+          <div className="mr-auto text-[11px] text-white/60 pill">Memory genutzt: {memoryUsed} Einträge</div>
         ) : null}
       </div>
-      <ChatInput value={input} onChange={setInput} onSend={onSend} disabled={streaming || !settings.modelId || !apiKey} />
+      <ChatInput
+        value={input}
+        onChange={setInput}
+        onSend={onSend}
+        disabled={streaming || !settings.modelId || !apiKey}
+      />
     </div>
   );
 }

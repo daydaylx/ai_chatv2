@@ -7,18 +7,14 @@ import { formatRelative } from "../shared/lib/time";
 type Props = {
   open: boolean;
   onOpenChange: (v: boolean) => void;
+  className?: string;
 };
 
-export default function SessionDrawer({ open, onOpenChange }: Props) {
+export default function SessionDrawer({ open, onOpenChange, className }: Props) {
   const sess = useSession();
 
-  const onNew = async () => {
-    await sess.newSession();
-  };
-  const onSwitch = async (id: string) => {
-    await sess.switchSession(id);
-    onOpenChange(false);
-  };
+  const onNew = async () => { await sess.newSession(); };
+  const onSwitch = async (id: string) => { await sess.switchSession(id); onOpenChange(false); };
   const onRename = async (id: string, current: string) => {
     const title = prompt("Neuer Titel:", current ?? "Session");
     if (title == null) return;
@@ -30,18 +26,18 @@ export default function SessionDrawer({ open, onOpenChange }: Props) {
   };
 
   return (
-    <Sheet open={open} onOpenChange={onOpenChange} title="Sessions" className="sm:w-[560px]">
+    <Sheet open={open} onOpenChange={onOpenChange} title="Sessions" className={className ?? ""}>
       <div className="grid gap-3">
         <div className="flex justify-between items-center">
           <div className="text-sm text-white/70">{sess.sessions.length} gespeichert</div>
-          <Button onClick={onNew}>Neue Session</Button>
+          <Button onClick={onNew} className="glow-ring">Neue Session</Button>
         </div>
 
-        <div className="flex flex-col divide-y divide-white/8 rounded-xl border border-white/12 overflow-hidden">
+        <div className="flex flex-col divide-y divide-white/8 rounded-xl border border-white/12 overflow-hidden glass-card">
           {sess.sessions.map((s) => {
             const active = s.id === sess.currentId;
             return (
-              <div key={s.id} className={["p-3 sm:p-3.5", active ? "bg-white/[0.05]" : "bg-transparent"].join(" ")}>
+              <div key={s.id} className={["p-3 sm:p-3.5 hover-lift transition-transform", active ? "bg-white/[0.06]" : "bg-transparent"].join(" ")}>
                 <div className="flex items-start gap-3">
                   <button
                     onClick={() => onSwitch(s.id)}
@@ -53,8 +49,8 @@ export default function SessionDrawer({ open, onOpenChange }: Props) {
                     <div className="text-xs text-white/60">{formatRelative(s.updatedAt)}</div>
                   </button>
                   <div className="shrink-0 flex items-center gap-1">
-                    <Button variant="outline" size="sm" onClick={() => onRename(s.id, s.title)}>Umbenennen</Button>
-                    <Button variant="ghost" size="sm" onClick={() => onDelete(s.id, s.title)}>Löschen</Button>
+                    <Button variant="outline" size="sm" onClick={() => onRename(s.id, s.title)} className="glow-ring">Umbenennen</Button>
+                    <Button variant="ghost" size="sm" onClick={() => onDelete(s.id, s.title)} className="glow-ring">Löschen</Button>
                   </div>
                 </div>
               </div>

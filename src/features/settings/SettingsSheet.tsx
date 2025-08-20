@@ -9,7 +9,9 @@ import { PersonaContext } from "../../entities/persona";
 import { useClient } from "../../lib/client";
 import { useModelCatalog } from "../../lib/catalog";
 import ModelPicker from "../models/ModelPicker";
+import StylePicker from "../styles/StylePicker";
 import { getAccent, setAccent, type Accent } from "../../shared/lib/theme";
+import { ruleForStyle, isModelAllowed } from "../../config/styleModelRules";
 
 type Props = { open: boolean; onOpenChange: (v: boolean) => void; };
 
@@ -24,12 +26,16 @@ export default function SettingsSheet({ open, onOpenChange }: Props) {
   const [fNSFW, setFNSFW] = React.useState(false);
   const [fFast, setFFast] = React.useState(false);
 
+  const rule = React.useMemo(() => ruleForStyle(settings.personaId), [settings.personaId]);
+
   const models = React.useMemo(() => {
     const all = catalog.models;
     const filtered = all.filter(m => {
       if (fFree && !m.free) return false;
       if (fNSFW && !m.allow_nsfw) return false;
       if (fFast && !m.fast) return false;
+      // Stil-Regel anwenden
+      if (!isModelAllowed(rule, m.id, m.name ?? m.description ?? undefined)) return false;
       return true;
     });
     const s = q.trim().toLowerCase();
@@ -40,10 +46,15 @@ export default function SettingsSheet({ open, onOpenChange }: Props) {
         .toLowerCase()
         .includes(s)
     );
-  }, [catalog.models, q, fFree, fNSFW, fFast]);
+  }, [catalog.models, q, fFree, fNSFW, fFast, rule]);
 
   const [accent, setAcc] = React.useState<Accent>(() => getAccent());
   const changeAccent = (a: Accent) => { setAccent(a); setAcc(a); };
+
+  const currentStyle = React.useMemo(
+    () => data.styles.find((s) => s.id === settings.personaId) ?? null,
+    [data.styles, settings.personaId]
+  );
 
   return (
     <Sheet open={open} onOpenChange={onOpenChange} title="Einstellungen">
@@ -74,7 +85,7 @@ export default function SettingsSheet({ open, onOpenChange }: Props) {
           </section>
 
           <section className="grid gap-2 mt-3">
-            <h3 className="text-sm font-semibold">Verfügbare Modelle</h3>
+            <h3 className="text-sm font-semibold">Verfügbare Modelle {rule ? <span className="text-xs text-white/60">(gefiltert durch Stil)</span> : null}</h3>
             <ModelPicker
               models={models.map(m => ({
                 id: m.id, label: m.name ?? m.id, description: m.description ?? "",
@@ -91,31 +102,50 @@ export default function SettingsSheet({ open, onOpenChange }: Props) {
 
         <Tab title="Assistent">
           <section className="grid gap-3">
-            <label className="flex items-center justify-between gap-3">
-              <div>
-                <div className="text-sm font-medium">Kontext automatisch zusammenfassen</div>
-                <div className="text-xs text-white/70">Ab ~20 Nachrichten oder ~4 k Zeichen wird eine Kurzfassung erstellt.</div>
-              </div>
-              <Switch checked={settings.autoSummarize} onCheckedChange={settings.setAutoSummarize} />
-            </label>
-
-            <label className="flex items-center justify-between gap-3">
-              <div>
-                <div className="text-sm font-medium">Memory aktivieren</div>
-                <div className="text-xs text-white/70">Extrahiert langlebige Präferenzen/Fakten in regelmäßigen Abständen.</div>
-              </div>
-              <Switch checked={settings.autoMemory} onCheckedChange={settings.setAutoMemory} />
-            </label>
-
-            <div className="grid gap-1">
-              <div className="text-sm font-medium">Summarizer-Modell (optional)</div>
-              <Input
-                placeholder="z. B. mistral-small oder llama-3.1-8b"
-                value={settings.summarizerModelId ?? ""}
-                onChange={(e) => settings.setSummarizerModelId(e.target.value || null)}
-                aria-label="Summarizer-Modell"
+            <div className="grid gap-2">
+              <h3 className="text-sm font-semibold">Stil auswählen</h3>
+              <StylePicker
+                styles={data.styles.map(s => ({ id: s.id, name: s.name, description: s.description, system: s.system }))}
+                selectedId={settings.personaId}
+                onSelect={(id) => settings.setPersonaId(id)}
               />
-              <div className="text-xs text-white/60">Leer lassen, um das Hauptmodell zu verwenden.</div>
+            </div>
+
+            <div className="grid gap-2">
+              <h3 className="text-sm font-semibold">System-Prompt (Vorschau)</h3>
+              <div className="rounded-xl border border-white/12 bg-white/[0.04] p-3 max-h-52 overflow-auto text-[13px] leading-5 whitespace-pre-wrap">
+                {currentStyle?.system ?? "Kein Stil ausgewählt. Standard-Neutral wird genutzt."}
+              </div>
+              <div className="text-xs text-white/60">Dieser Text wird als <code>system</code>-Nachricht vor jede Konversation gesetzt.</div>
+            </div>
+
+            <div className="grid gap-3">
+              <label className="flex items-center justify-between gap-3">
+                <div>
+                  <div className="text-sm font-medium">Kontext automatisch zusammenfassen</div>
+                  <div className="text-xs text-white/70">Ab ~20 Nachrichten oder ~4 k Zeichen wird eine Kurzfassung erstellt.</div>
+                </div>
+                <Switch checked={settings.autoSummarize} onCheckedChange={settings.setAutoSummarize} />
+              </label>
+
+              <label className="flex items-center justify-between gap-3">
+                <div>
+                  <div className="text-sm font-medium">Memory aktivieren</div>
+                  <div className="text-xs text-white/70">Extrahiert langlebige Präferenzen/Fakten in regelmäßigen Abständen.</div>
+                </div>
+                <Switch checked={settings.autoMemory} onCheckedChange={settings.setAutoMemory} />
+              </label>
+
+              <div className="grid gap-1">
+                <div className="text-sm font-medium">Summarizer-Modell (optional)</div>
+                <Input
+                  placeholder="z. B. mistral-small oder llama-3.1-8b"
+                  value={settings.summarizerModelId ?? ""}
+                  onChange={(e) => settings.setSummarizerModelId(e.target.value || null)}
+                  aria-label="Summarizer-Modell"
+                />
+                <div className="text-xs text-white/60">Leer lassen, um das Hauptmodell zu verwenden.</div>
+              </div>
             </div>
           </section>
         </Tab>

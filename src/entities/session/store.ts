@@ -8,6 +8,7 @@ import {
   getSession,
   addMessage,
   listMessagesBySession,
+  deleteSession as dbDeleteSession,
 } from "./db";
 
 export type SessionState = {
@@ -20,6 +21,7 @@ export type SessionState = {
   newSession: () => Promise<void>;
   switchSession: (id: string) => Promise<void>;
   removeSession: (id: string) => Promise<void>;
+  renameSession: (id: string, title: string) => Promise<void>;
 
   appendUser: (content: string) => Promise<Message>;
   appendAssistant: (content: string) => Promise<Message>;
@@ -64,8 +66,28 @@ export const useSession = create<SessionState>((set, get) => ({
     set({ currentId: id, messages: msgs });
   },
 
-  removeSession: async (_id: string) => {
-    console.warn("removeSession: not implemented in Phase 2");
+  removeSession: async (id: string) => {
+    await dbDeleteSession(id);
+    const list = await listSessions();
+    // Wenn die aktuelle weg ist → auf erste verbleibende wechseln
+    let nextId: string | null = get().currentId;
+    if (id === get().currentId) {
+      nextId = list[0]?.id ?? null;
+      const msgs = nextId ? await listMessagesBySession(nextId) : [];
+      set({ currentId: nextId, messages: msgs, sessions: list });
+      return;
+    }
+    set({ sessions: list });
+  },
+
+  renameSession: async (id: string, title: string) => {
+    const s = await getSession(id);
+    if (!s) return;
+    const clean = title.trim().slice(0, 80);
+    s.title = clean || "Session";
+    s.updatedAt = Date.now();
+    await putSession(s);
+    set({ sessions: await listSessions() });
   },
 
   appendUser: async (content: string) => {

@@ -15,8 +15,8 @@ import { injectMemory } from "../../lib/memoryPipeline";
 type Bubble = ChatMessage & { id: string; ts: number };
 
 const uuid = () =>
-  (crypto as any)?.randomUUID?.() ??
-  `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+  ((crypto as any)?.randomUUID?.()) ||
+  (Date.now().toString() + "-" + Math.random().toString(36).slice(2, 8));
 
 export default function ChatPanel() {
   const [items, setItems] = React.useState<Bubble[]>([]);
@@ -122,12 +122,12 @@ export default function ChatPanel() {
       if (!ok) {
         const brief = [
           ...(rule.allowedIds ?? []),
-          ...(rule.allowedPatterns ?? []).map((p) => `/${p}/`),
+          ...(rule.allowedPatterns ?? []).map(function (p) { return "/" + p + "/"; }),
         ]
           .slice(0, 6)
           .join(", ");
         toast.show(
-          `Stil erfordert bestimmte Modelle. Erlaubt: ${brief || "siehe Liste"}`,
+          "Stil erfordert bestimmte Modelle. Erlaubt: " + (brief || "siehe Liste"),
           "error"
         );
         openSettings("model");
@@ -168,7 +168,7 @@ export default function ChatPanel() {
       // Dev-Guard: Stil 1:1
       if (import.meta.env?.DEV) {
         const chosen = currentStyle?.system ?? "";
-        const sys = base.at(0)?.content ?? "";
+        const sys = (base.length > 0 ? base[0].content : "") ?? "";
         if (chosen !== sys)
           console.warn("[guard] System-Prompt weicht ab (nicht 1:1)");
       }
@@ -210,11 +210,9 @@ export default function ChatPanel() {
       const msg =
         String(e?.name || "").toLowerCase() === "aborterror"
           ? "⏹️ abgebrochen"
-          : `❌ ${String(e?.message ?? e)}`;
+          : "❌ " + String(e?.message ?? e);
       setItems((prev) =>
-        prev.map((b) =>
-          b.id === items.at(-1)?.id ? { ...b, content: b.content || msg } : b
-        )
+        prev.map((b) => (b.id === asst.id ? { ...b, content: b.content || msg } : b))
       );
     } finally {
       setBusy(false);

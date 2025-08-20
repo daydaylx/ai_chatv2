@@ -4,6 +4,9 @@
  *  - sessions  (key: id)
  *  - messages  (key: id, index: sessionId, createdAt)
  *  - memory    (key: id, index: updatedAt)
+ *
+ * Hinweise:
+ * - SessionMeta kann zusätzliche Felder tragen (z. B. runningSummary), ohne Schema-Upgrade.
  */
 
 export type SessionMeta = {
@@ -11,6 +14,7 @@ export type SessionMeta = {
   title: string;
   createdAt: number;
   updatedAt: number;
+  runningSummary?: string; // rollierende Zusammenfassung (optional)
 };
 
 export type ChatRole = "system" | "user" | "assistant";
@@ -121,6 +125,31 @@ export async function listMessagesBySession(sessionId: string): Promise<Message[
       const cur = rq.result;
       if (cur) { out.push(cur.value as Message); cur.continue(); }
       else resolve(out.sort((a,b) => a.createdAt - b.createdAt));
+    };
+    rq.onerror = () => reject(rq.error);
+  });
+}
+
+/** Kürzt alte Nachrichten einer Session, so dass nur noch die letzten keepLastN verbleiben. */
+export async function pruneMessages(sessionId: string, keepLastN: number): Promise<number> {
+  const db = await openDB();
+  return new Promise((resolve, reject) => {
+    const t = db.transaction("messages", "readwrite");
+    const idx = t.objectStore("messages").index("sessionId");
+    const rq = idx.openCursor(IDBKeyRange.only(sessionId));
+    const list: Array<{ pk: IDBValidKey; createdAt: number }> = [];
+    rq.onsuccess = () => {
+      const cur = rq.result;
+      if (cur) {
+        const v = cur.value as Message;
+        list.push({ pk: cur.primaryKey as IDBValidKey, createdAt: v.createdAt });
+        cur.continue();
+      } else {
+        list.sort((a,b) => a.createdAt - b.createdAt);
+        const toDelete = Math.max(0, list.length - keepLastN);
+        for (let i = 0; i < toDelete; i++) t.objectStore("messages").delete(list[i].pk);
+        resolve(toDelete);
+      }
     };
     rq.onerror = () => reject(rq.error);
   });

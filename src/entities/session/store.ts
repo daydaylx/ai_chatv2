@@ -9,6 +9,7 @@ import {
   addMessage,
   listMessagesBySession,
   deleteSession as dbDeleteSession,
+  pruneMessages as dbPruneMessages,
 } from "./db";
 
 export type SessionState = {
@@ -22,10 +23,14 @@ export type SessionState = {
   switchSession: (id: string) => Promise<void>;
   removeSession: (id: string) => Promise<void>;
   renameSession: (id: string, title: string) => Promise<void>;
+  setRunningSummary: (id: string, summary: string) => Promise<void>;
 
   appendUser: (content: string) => Promise<Message>;
   appendAssistant: (content: string) => Promise<Message>;
   updateTitleFromFirstUser: () => Promise<void>;
+
+  pruneMessages: (keepLastN: number) => Promise<number>;
+  getCurrentRunningSummary: () => Promise<string>;
 };
 
 export const useSession = create<SessionState>((set, get) => ({
@@ -40,7 +45,7 @@ export const useSession = create<SessionState>((set, get) => ({
     if (!list.length) {
       const id = nanoid();
       const now = Date.now();
-      const meta: SessionMeta = { id, title: "Neue Session", createdAt: now, updatedAt: now };
+      const meta: SessionMeta = { id, title: "Neue Session", createdAt: now, updatedAt: now, runningSummary: "" };
       await putSession(meta);
       set({ currentId: id, sessions: [meta], messages: [], loading: false });
       return;
@@ -53,7 +58,7 @@ export const useSession = create<SessionState>((set, get) => ({
   newSession: async () => {
     const id = nanoid();
     const now = Date.now();
-    const meta: SessionMeta = { id, title: "Neue Session", createdAt: now, updatedAt: now };
+    const meta: SessionMeta = { id, title: "Neue Session", createdAt: now, updatedAt: now, runningSummary: "" };
     await putSession(meta);
     const list = await listSessions();
     set({ currentId: id, sessions: list, messages: [] });
@@ -69,7 +74,6 @@ export const useSession = create<SessionState>((set, get) => ({
   removeSession: async (id: string) => {
     await dbDeleteSession(id);
     const list = await listSessions();
-    // Wenn die aktuelle weg ist → auf erste verbleibende wechseln
     let nextId: string | null = get().currentId;
     if (id === get().currentId) {
       nextId = list[0]?.id ?? null;
@@ -90,11 +94,20 @@ export const useSession = create<SessionState>((set, get) => ({
     set({ sessions: await listSessions() });
   },
 
+  setRunningSummary: async (id: string, summary: string) => {
+    const s = await getSession(id);
+    if (!s) return;
+    s.runningSummary = (summary || "").trim();
+    s.updatedAt = Date.now();
+    await putSession(s);
+    set({ sessions: await listSessions() });
+  },
+
   appendUser: async (content: string) => {
     const id = get().currentId ?? nanoid();
     if (!get().currentId) {
       const now = Date.now();
-      const meta: SessionMeta = { id, title: "Neue Session", createdAt: now, updatedAt: now };
+      const meta: SessionMeta = { id, title: "Neue Session", createdAt: now, updatedAt: now, runningSummary: "" };
       await putSession(meta);
       set({ currentId: id, sessions: await listSessions(), messages: [] });
     }
@@ -146,6 +159,22 @@ export const useSession = create<SessionState>((set, get) => ({
       await putSession(s);
       set({ sessions: await listSessions() });
     }
+  },
+
+  pruneMessages: async (keepLastN: number) => {
+    const id = get().currentId;
+    if (!id) return 0;
+    const removed = await dbPruneMessages(id, keepLastN);
+    const msgs = await listMessagesBySession(id);
+    set({ messages: msgs });
+    return removed;
+  },
+
+  getCurrentRunningSummary: async () => {
+    const id = get().currentId;
+    if (!id) return "";
+    const meta = await getSession(id);
+    return meta?.runningSummary ?? "";
   },
 }));
 

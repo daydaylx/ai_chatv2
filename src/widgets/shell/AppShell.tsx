@@ -3,17 +3,18 @@ import Header from "../../components/Header";
 import SettingsSheet from "../../features/settings/SettingsSheet";
 import SessionDrawer from "../../components/SessionDrawer";
 import { initAccent } from "../../shared/lib/theme";
-import "../../shared/styles/glass.css";
+/* PAPER-Stile statt Glass: */
+import "../../shared/styles/paper.css";
 
 export function AppShell({ children }: { children: React.ReactNode }) {
   const [openSettings, setOpenSettings] = React.useState(false);
   const [openSessions, setOpenSessions] = React.useState(false);
 
-  React.useEffect(() => { initAccent("violet"); }, []);
+  React.useEffect(() => { initAccent("amber"); }, []); // warmer Standard-Akzent passt zum Paper-Theme
 
   return (
     <div className="relative min-h-[100svh] text-[hsl(var(--white))]">
-      {/* Hintergrund-Layer (radiale Gradients + Noise) */}
+      {/* Hintergrund-Layer (Paper-Spots + Grain) */}
       <div className="glass-bg" aria-hidden />
       <div className="glass-noise" aria-hidden />
 
@@ -23,7 +24,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
         {children}
       </main>
 
-      {/* Sheets / Drawer */}
+      {/* Sheets / Drawer (bekommen ihre Optik über die paper.css-Styles) */}
       <SettingsSheet open={openSettings} onOpenChange={setOpenSettings} className="glass-sheet" />
       <SessionDrawer open={openSessions} onOpenChange={setOpenSessions} className="glass-sheet" />
     </div>

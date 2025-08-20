@@ -1,146 +1,181 @@
 /**
- * OpenRouter-Miniclient:
- * - sendChat(streaming)
- * - listModels() für ModelPicker (kompatible Exporte)
+ * Robuster OpenRouter-Client mit JSON-Delta-Streaming.
+ * Zusätzlich: Kompatibilitätsexporte `OpenRouterClient` und `sendChat`,
+ * weil andere Module diese erwarten.
  */
+
 export type ChatMessage = { role: "system" | "user" | "assistant"; content: string };
+
+export type StreamCallbacks = {
+  onToken?: (t: string) => void;
+  onError?: (msg: string) => void;
+  onDone?: () => void;
+};
 
 export type SendOptions = {
   apiKey: string;
   model: string;
-  messages: ChatMessage[]; // messages[0] MUSS system=persona.system sein (1:1)
+  messages: ChatMessage[];
+  temperature?: number;
   signal?: AbortSignal;
-  onToken?: (chunk: string) => void;
   timeoutMs?: number;
 };
 
-export type OpenRouterModel = {
-  id: string;
-  name?: string;
-  description?: string;
-  context_length?: number;
-  pricing?: unknown;
-};
+async function fetchWithTimeout(input: RequestInfo, init: RequestInit = {}, timeoutMs = 30000): Promise<Response> {
+  const controller = new AbortController();
+  const id = setTimeout(() => controller.abort(), timeoutMs);
+  try {
+    return await fetch(input, { ...init, signal: init.signal ?? controller.signal });
+  } finally {
+    clearTimeout(id);
+  }
+}
 
-const ORIGIN = "https://openrouter.ai";
-const CHAT_ENDPOINT = `${ORIGIN}/api/v1/chat/completions`;
-const MODELS_ENDPOINT = `${ORIGIN}/api/v1/models`;
+/**
+ * Niedrigstufige API: Stream direkt starten.
+ * Nutzt SSE ("data: ...") und extrahiert content aus common Feldern.
+ */
+export async function streamChat(opts: SendOptions, cbs: StreamCallbacks = {}) {
+  const { apiKey, model, messages, temperature = 0.7, signal, timeoutMs = 60000 } = opts;
 
-export async function sendChat(opts: SendOptions): Promise<string> {
-  const { apiKey, model, messages, onToken, signal, timeoutMs = 45000 } = opts;
+  if (!apiKey) {
+    cbs.onError?.("Kein API-Schlüssel gesetzt.");
+    return;
+  }
 
-  // Dev-Guard mit sauberen Narrowings
-  if (import.meta.env?.DEV) {
-    const first = messages?.[0];
-    if (!Array.isArray(messages) || messages.length === 0) {
-      console.warn("[guard] messages leer");
-    } else if (!first || first.role !== "system") {
-      console.warn("[guard] messages[0] ist nicht role=system");
-    } else if (typeof first.content !== "string" || !first.content.length) {
-      console.warn("[guard] system.content leer");
+  let res: Response;
+  try {
+    res = await fetchWithTimeout("https://openrouter.ai/api/v1/chat/completions", {
+      method: "POST",
+      headers: {
+        "Authorization": `Bearer ${apiKey}`,
+        "Content-Type": "application/json",
+        "HTTP-Referer": location.origin,
+        "X-Title": "ai_chatv2",
+      },
+      body: JSON.stringify({
+        model,
+        messages,
+        temperature,
+        stream: true,
+      }),
+      signal,
+    }, timeoutMs);
+  } catch (e: any) {
+    if (e?.name === "AbortError") {
+      cbs.onError?.("Abgebrochen.");
+      return;
     }
+    cbs.onError?.("Netzwerkfehler. Prüfe Verbindung.");
+    return;
   }
 
-  const ctrl = new AbortController();
-  const timer = setTimeout(() => ctrl.abort(), timeoutMs);
-  const composite = mergeSignals(ctrl.signal, signal);
-
-  const res = await fetch(CHAT_ENDPOINT, {
-    method: "POST",
-    headers: {
-      "Authorization": `Bearer ${apiKey}`,
-      "Content-Type": "application/json",
-      "HTTP-Referer": "https://local.app",
-      "X-Title": "ai_chatv2",
-    },
-    body: JSON.stringify({ model, messages, stream: true }),
-    signal: composite,
-  }).catch((e) => {
-    clearTimeout(timer);
-    throw new Error(`Netzwerkfehler: ${String(e?.message ?? e)}`);
-  });
-
-  if (!res.ok) {
-    clearTimeout(timer);
-    const txt = await safeText(res);
-    throw new Error(humanError(res.status, txt));
+  if (!res.ok || !res.body) {
+    const status = res.status;
+    const text = await res.text().catch(() => "");
+    if (status === 429) cbs.onError?.("Rate-Limit erreicht (429). Bitte kurz warten und erneut versuchen.");
+    else if (status >= 500) cbs.onError?.("OpenRouter antwortet nicht stabil (5xx). Später erneut versuchen.");
+    else cbs.onError?.(`Fehler ${status}: ${text || "Unbekannter Fehler"}`);
+    return;
   }
 
-  const reader = res.body!.getReader();
-  const decoder = new TextDecoder();
-  let acc = "";
+  const reader = res.body.getReader();
+  const decoder = new TextDecoder("utf-8");
+  let buffer = "";
 
   try {
     while (true) {
-      const { done, value } = await reader.read();
+      const { value, done } = await reader.read();
       if (done) break;
-      const chunk = decoder.decode(value, { stream: true });
-      for (const line of chunk.split("\n")) {
-        const trimmed = line.trim();
-        if (!trimmed || !trimmed.startsWith("data:")) continue;
-        const payload = trimmed.slice(5).trim();
-        if (payload === "[DONE]") {
-          // fertig
-        } else {
-          try {
-            const obj = JSON.parse(payload);
-            const delta = obj?.choices?.[0]?.delta?.content ?? "";
-            if (delta && typeof delta === "string") {
-              acc += delta;
-              onToken?.(delta);
-            }
-          } catch {
-            // Herzschläge/Teilpakete ignorieren
-          }
+      buffer += decoder.decode(value, { stream: true });
+
+      // SSE-Events sind durch \n\n getrennt
+      let idx: number;
+      while ((idx = buffer.indexOf("\n\n")) !== -1) {
+        const chunk = buffer.slice(0, idx).trim();
+        buffer = buffer.slice(idx + 2);
+
+        if (!chunk.startsWith("data:")) continue;
+        const data = chunk.slice(5).trim();
+        if (data === "[DONE]") {
+          cbs.onDone?.();
+          return;
+        }
+        try {
+          const json = JSON.parse(data);
+          const piece =
+            json?.choices?.[0]?.delta?.content ??
+            json?.choices?.[0]?.message?.content ??
+            json?.content ??
+            "";
+          if (piece) cbs.onToken?.(piece);
+        } catch {
+          if (data && data !== "null") cbs.onToken?.(String(data));
         }
       }
     }
+  } catch (e: any) {
+    if (e?.name === "AbortError") cbs.onError?.("Abgebrochen.");
+    else cbs.onError?.("Stream abgebrochen. Verbindung instabil?");
   } finally {
-    clearTimeout(timer);
-    try { reader.releaseLock(); } catch {}
+    cbs.onDone?.();
   }
-
-  return acc;
 }
 
+/* ------------------------------------------------------------------ */
+/* Kompatibilitätsschicht                                             */
+/* ------------------------------------------------------------------ */
+
+/**
+ * Historische High-Level-Funktion, die von `lib/client.tsx` importiert wird.
+ * Delegiert auf streamChat; akzeptiert eine Optionsstruktur mit Callbacks.
+ */
+export async function sendChat(args: {
+  apiKey: string;
+  model: string;
+  messages: ChatMessage[];
+  temperature?: number;
+  signal?: AbortSignal;
+  timeoutMs?: number;
+  onToken?: (t: string) => void;
+  onError?: (m: string) => void;
+  onDone?: () => void;
+}) {
+  const {
+    apiKey, model, messages, temperature, signal, timeoutMs,
+    onToken, onError, onDone,
+  } = args;
+
+  return streamChat(
+    { apiKey, model, messages, temperature, signal, timeoutMs },
+    { onToken, onError, onDone }
+  );
+}
+
+/**
+ * Historische Klassen-API, die z. B. von `lib/catalog.ts` importiert wird.
+ * Bietet `send()` und nutzt intern streamChat.
+ */
 export class OpenRouterClient {
-  // opts optional, apiKey optional → rückwärtskompatibel zu new OpenRouterClient()
-  constructor(private opts?: { apiKey?: string }) {}
-
-  async listModels(): Promise<OpenRouterModel[]> {
-    const headers: Record<string,string> = { "Content-Type": "application/json" };
-    if (this.opts?.apiKey) headers["Authorization"] = `Bearer ${this.opts.apiKey}`;
-
-    const res = await fetch(MODELS_ENDPOINT, { headers });
-    if (!res.ok) throw new Error(`Model-List fehlgeschlagen: HTTP ${res.status}`);
-    const data = await res.json().catch(() => ({}));
-    const list: OpenRouterModel[] = Array.isArray((data as any)?.data) ? (data as any).data : [];
-    return list;
+  private apiKey: string;
+  constructor(apiKey: string) {
+    this.apiKey = apiKey;
   }
-}
 
-function mergeSignals(a: AbortSignal, b?: AbortSignal): AbortSignal {
-  if (!b) return a;
-  const ctrl = new AbortController();
-  const onAbort = () => ctrl.abort();
-  a.addEventListener("abort", onAbort);
-  b.addEventListener("abort", onAbort);
-  if (a.aborted || b.aborted) ctrl.abort();
-  return ctrl.signal;
-}
-
-async function safeText(res: Response): Promise<string> {
-  try { return await res.text(); } catch { return ""; }
-}
-
-function humanError(status: number, raw: string): string {
-  const msg = raw || "";
-  if (status === 401) return "Nicht autorisiert. API-Key prüfen.";
-  if (status === 403) return /nsfw|policy/i.test(msg) ? "Inhalt vom Anbieter blockiert." : "Kein Zugriff auf dieses Modell / Plan.";
-  if (status === 404) return "Modell oder Endpoint nicht gefunden.";
-  if (status === 408) return "Zeitüberschreitung beim Anbieter.";
-  if (status === 409) return "Konflikt beim Anbieter. Bitte erneut senden.";
-  if (status === 422) return "Request unzulässig/zu groß (422).";
-  if (status >= 500) return "Anbieter-Fehler (5xx). Bitte später erneut versuchen.";
-  return msg || `HTTP ${status}`;
+  async send(args: {
+    model: string;
+    messages: ChatMessage[];
+    temperature?: number;
+    signal?: AbortSignal;
+    timeoutMs?: number;
+    onToken?: (t: string) => void;
+    onError?: (m: string) => void;
+    onDone?: () => void;
+  }) {
+    const { model, messages, temperature, signal, timeoutMs, onToken, onError, onDone } = args;
+    return streamChat(
+      { apiKey: this.apiKey, model, messages, temperature, signal, timeoutMs },
+      { onToken, onError, onDone }
+    );
+  }
 }

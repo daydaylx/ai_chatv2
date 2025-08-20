@@ -16,7 +16,7 @@ export async function saveChat(items: ChatItem[]): Promise<void> {
     await tx.done;
     db.close();
   } catch {
-    try { localStorage.setItem("chat_items", JSON.stringify(items)); } catch {}
+    try { localStorage.setItem("chat_items", JSON.stringify(items)); } catch { void 0; }
   }
 }
 
@@ -32,7 +32,7 @@ export async function loadChat(): Promise<ChatItem[]> {
     try {
       const raw = localStorage.getItem("chat_items");
       if (raw) return JSON.parse(raw);
-    } catch {}
+    } catch { void 0; }
   }
   return [];
 }
@@ -61,7 +61,7 @@ function open(): Promise<MiniDB> {
           });
           return { objectStore: (n) => tx.objectStore(n), done };
         },
-        close() { try { db.close(); } catch {} }
+        close() { try { db.close(); } catch { void 0; } }
       };
       resolve(wrap);
     };

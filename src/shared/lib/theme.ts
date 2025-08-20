@@ -13,7 +13,7 @@ export function initAccent(defaultAccent: Accent = "violet") {
 }
 
 export function setAccent(accent: Accent) {
-  try { localStorage.setItem(LS_KEY, accent); } catch {}
+  try { localStorage.setItem(LS_KEY, accent); } catch { void 0; }
   document.documentElement.dataset.accent = accent;
 }
 

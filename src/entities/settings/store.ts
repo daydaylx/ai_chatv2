@@ -33,7 +33,7 @@ function writeLS(key: string, v: string | null) {
     if (typeof window === "undefined" || !("localStorage" in window)) return;
     if (v === null || v === "") window.localStorage.removeItem(key);
     else window.localStorage.setItem(key, v);
-  } catch {}
+  } catch { void 0; }
 }
 
 function readJSON<T>(key: string, fallback: T): T {
@@ -49,7 +49,7 @@ function writeJSON(key: string, obj: any) {
   try {
     if (typeof window === "undefined" || !("localStorage" in window)) return;
     window.localStorage.setItem(key, JSON.stringify(obj));
-  } catch {}
+  } catch { void 0; }
 }
 
 // Defaults laut Tests

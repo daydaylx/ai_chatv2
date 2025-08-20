@@ -1,9 +1,8 @@
 /**
- * Was & Warum:
  * Kapselt das Laden/Validieren der Persona-Daten in einen Provider.
- * App.tsx wird schlanker; PersonaContext bleibt identisch nutzbar.
+ * Fix: loadPersona ist useCallback-stabil → keine react-hooks/exhaustive-deps Warnung mehr.
  */
-import React, { useEffect, useState } from "react";
+import React, { useCallback, useEffect, useState } from "react";
 import { PersonaContext, PersonaData, PersonaStyle, PersonaModel } from "./persona";
 
 type Props = { children: React.ReactNode };
@@ -13,9 +12,7 @@ export function PersonaProvider({ children }: Props) {
   const [warnings, setWarnings] = useState<string[]>([]);
   const [error, setError] = useState<string | null>(null);
 
-  useEffect(() => { void loadPersona(); }, []);
-
-  async function loadPersona() {
+  const loadPersona = useCallback(async () => {
     setWarnings([]); setError(null);
     try {
       let data: any | null = await tryFetchJSON("/persona.json");
@@ -31,7 +28,9 @@ export function PersonaProvider({ children }: Props) {
       setPersona({ models: [], styles: [{ id:"neutral", name:"Sachlich", system:"Kurz, präzise, Deutsch." }]});
       setError("Konfiguration nicht geladen – Standardwerte aktiv.");
     }
-  }
+  }, []);
+
+  useEffect(() => { void loadPersona(); }, [loadPersona]);
 
   async function tryFetchJSON(url: string): Promise<any | null> {
     try {

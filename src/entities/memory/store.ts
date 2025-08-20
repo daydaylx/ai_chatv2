@@ -40,7 +40,7 @@ function loadInitial(): MemoryState {
     return ageDays <= e.ttlDays;
   });
   if (pruned.length !== entries.length) {
-    try { localStorage.setItem(LS_ENTRIES, JSON.stringify(pruned)); } catch {}
+    try { localStorage.setItem(LS_ENTRIES, JSON.stringify(pruned)); } catch { void 0; }
   }
   return { enabled: !!enabled, autoExtract: !!auto, entries: pruned };
 }
@@ -50,9 +50,9 @@ const store = {
   listeners: new Set<Listener>(),
   set(partial: Partial<MemoryState>) {
     store.state = { ...store.state, ...partial };
-    try { localStorage.setItem(LS_ENABLED, JSON.stringify(store.state.enabled)); } catch {}
-    try { localStorage.setItem(LS_AUTO,    JSON.stringify(store.state.autoExtract)); } catch {}
-    try { localStorage.setItem(LS_ENTRIES, JSON.stringify(store.state.entries)); } catch {}
+    try { localStorage.setItem(LS_ENABLED, JSON.stringify(store.state.enabled)); } catch { void 0; }
+    try { localStorage.setItem(LS_AUTO,    JSON.stringify(store.state.autoExtract)); } catch { void 0; }
+    try { localStorage.setItem(LS_ENTRIES, JSON.stringify(store.state.entries)); } catch { void 0; }
     store.listeners.forEach(l => l());
   },
   subscribe(l: Listener) { store.listeners.add(l); return () => store.listeners.delete(l); },

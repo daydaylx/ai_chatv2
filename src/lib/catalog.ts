@@ -1,193 +1,101 @@
 import * as React from "react";
-import type { PersonaModel } from "../entities/persona";
-import type { OpenRouterModel } from "./openrouter";
-import { OpenRouterClient } from "./openrouter";
+import { OpenRouterClient, type OpenRouterModel } from "./openrouter";
 
-/** UI-Shape für den Picker (kein Schema-Change an personas.json) */
-export type ModelVM = {
-  id: string;
-  name?: string;
-  label?: string;
-  description?: string;
-  ctx?: number;
-  context?: number;
-  tags?: string[];
-  free?: boolean;
-  allow_nsfw?: boolean;
-  fast?: boolean;
+export type CatalogStatus = "idle" | "loading" | "ready" | "error";
+
+export type CatalogState = {
+  models: OpenRouterModel[];
+  loading: boolean;
+  error: string | null;
+  status: CatalogStatus;
+  reload: () => void;
+  refresh: () => void; // Alias
 };
 
-type UseModelCatalogOpts = {
-  local: PersonaModel[];
+type UseCatalogOpts = {
+  local?: OpenRouterModel[];
   apiKey?: string | null;
-  /** Cache-Lebensdauer in Minuten (default 60) */
-  ttlMin?: number;
 };
 
-type State =
-  | { status: "loading"; models: ModelVM[]; error: null }
-  | { status: "ready"; models: ModelVM[]; error: null }
-  | { status: "error"; models: ModelVM[]; error: string };
+export function useModelCatalog(opts?: UseCatalogOpts): CatalogState {
+  // Stabilisiere 'local', damit es nicht bei jeder Objekt-Identität die Hooks triggert
+  const local = React.useMemo<OpenRouterModel[]>(
+    () => opts?.local ?? [],
+    // JSON.stringify trick stabilisiert einfache Arrays/Objekte ohne tiefe Vergleiche
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [JSON.stringify(opts?.local ?? [])]
+  );
+  const apiKey = (opts?.apiKey ?? "") || "";
 
-const LS_KEY = "model_catalog_cache_v1";
+  const [models, setModels] = React.useState<OpenRouterModel[]>(local);
+  const [loading, setLoading] = React.useState<boolean>(false);
+  const [error, setError] = React.useState<string | null>(null);
+  const [status, setStatus] = React.useState<CatalogStatus>(local.length ? "ready" : "idle");
 
-export function useModelCatalog(opts: UseModelCatalogOpts) {
-  const { local, apiKey, ttlMin = 60 } = opts;
-  const [st, setSt] = React.useState<State>({ status: "loading", models: [], error: null });
+  const abortRef = React.useRef<AbortController | null>(null);
 
-  const load = React.useCallback(async (force = false) => {
-    // Wichtig: error explizit auf null, nicht s spreaden (Union strict)
-    setSt(prev => ({ status: "loading", models: prev.models, error: null }));
-    try {
-      const cached = readCache(ttlMin);
-      const remote = force || !cached
-        ? await fetchRemote(apiKey ?? undefined)
-        : cached;
-
-      if (!cached && remote) writeCache(remote);
-
-      const merged = mergeLocalRemote(normalizeLocal(local), remote ?? []);
-      setSt({ status: "ready", models: merged, error: null });
-    } catch (e: any) {
-      // Fallback: zeige zumindest lokal normalisierte Modelle
-      const merged = mergeLocalRemote(normalizeLocal(local), []);
-      setSt({ status: "error", models: merged, error: String(e?.message ?? e) });
+  const load = React.useCallback(async () => {
+    if (!apiKey) {
+      setModels(local);
+      setError(null);
+      setLoading(false);
+      setStatus(local.length ? "ready" : "idle");
+      return;
     }
-  }, [apiKey, local, ttlMin]);
 
-  React.useEffect(() => { load(false); }, [load]);
+    abortRef.current?.abort();
+    const ac = new AbortController();
+    abortRef.current = ac;
+
+    setLoading(true);
+    setStatus("loading");
+    setError(null);
+
+    try {
+      const client = new OpenRouterClient({ apiKey });
+      const list = await client.listModels();
+      if (ac.signal.aborted) return;
+
+      const arr = Array.isArray(list) ? list : [];
+      setModels(arr.length ? arr : local);
+      setStatus("ready");
+    } catch (e: any) {
+      if (ac.signal.aborted) return;
+      setError(String(e?.message ?? e ?? "Unbekannter Fehler"));
+      setModels(local);
+      setStatus("error");
+    } finally {
+      if (!abortRef.current || abortRef.current === ac) {
+        setLoading(false);
+        abortRef.current = null;
+      }
+    }
+  }, [apiKey, local]);
+
+  React.useEffect(() => {
+    if (local.length) {
+      setModels(local);
+      if (status === "idle") setStatus("ready");
+    }
+    if (apiKey) void load();
+    return () => abortRef.current?.abort();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [apiKey, local]);
+
+  const reload = React.useCallback(() => { void load(); }, [load]);
 
   return {
-    status: st.status,
-    error: st.error,
-    models: st.models,
-    refresh: () => load(true),
-    hasRemote: !!readCache(ttlMin),
+    models,
+    loading,
+    error,
+    status,
+    reload,
+    refresh: reload,
   };
 }
 
-/* ---------------- intern ---------------- */
-
-function normalizeLocal(list: PersonaModel[]): ModelVM[] {
-  return list.map((m) => {
-    // Suffixe wie ":free:fast" abtrennen und Flags setzen.
-    const { baseId, flags } = splitIdFlags(m.id);
-    const vm: ModelVM = {
-      id: baseId,
-      name: m.name,
-      label: m.label,
-      description: m.description,
-      ctx: m.ctx ?? m.context,
-      context: m.context ?? m.ctx,
-      tags: Array.isArray(m.tags) ? [...m.tags] : [],
-      free: m.free || flags.free,
-      fast: m.fast || flags.fast,
-      allow_nsfw: m.allow_nsfw || flags.allow_nsfw,
-    };
-    if (flags.tags.length) vm.tags = [...(vm.tags ?? []), ...flags.tags];
-    return vm;
-  });
-}
-
-function splitIdFlags(rawId: string): { baseId: string; flags: { free: boolean; fast: boolean; allow_nsfw: boolean; tags: string[] } } {
-  if (!rawId.includes(":")) return { baseId: rawId, flags: { free: false, fast: false, allow_nsfw: false, tags: [] } };
-  const parts = rawId.split(":");
-  const baseId = parts[0] || rawId; // garantiert string
-  const rest = parts.slice(1).map(s => s.trim().toLowerCase()).filter(Boolean);
-  const flags = { free: false, fast: false, allow_nsfw: false, tags: [] as string[] };
-  for (const t of rest) {
-    if (t === "free") flags.free = true;
-    else if (t === "fast") flags.fast = true;
-    else if (t === "nsfw" || t === "allow_nsfw" || t === "18+") flags.allow_nsfw = true;
-    else flags.tags.push(t);
-  }
-  return { baseId, flags };
-}
-
-async function fetchRemote(apiKey?: string): Promise<OpenRouterModel[]> {
-  const client = new OpenRouterClient(apiKey ? { apiKey } : undefined);
-  const list = await client.listModels();
-  return Array.isArray(list) ? list : [];
-}
-
-function mergeLocalRemote(local: ModelVM[], remote: OpenRouterModel[]): ModelVM[] {
-  const rmap = new Map<string, OpenRouterModel>();
-  for (const r of remote) if (r?.id) rmap.set(r.id, r);
-
-  const seen = new Set<string>();
-  const out: ModelVM[] = [];
-
-  // 1) Lokale zuerst (IDs bleiben stabil), Remote reichert an
-  for (const m of local) {
-    const r = rmap.get(m.id);
-    const merged = enrich(m, r);
-    out.push(merged);
-    seen.add(m.id);
-  }
-
-  // 2) Remote-exklusive nachschieben
-  for (const r of remote) {
-    if (!r?.id || seen.has(r.id)) continue;
-    out.push(enrich({ id: r.id }, r));
-  }
-
-  // 3) Sortierung: alphabetisch; Favoriten-Order macht UI
-  return out.sort((a, b) => displayName(a).localeCompare(displayName(b)));
-}
-
-function displayName(m: ModelVM): string {
-  return (m.label ?? m.name ?? m.id).toLowerCase();
-}
-
-function enrich(base: ModelVM, r?: OpenRouterModel): ModelVM {
-  const vm: ModelVM = { ...base };
-  if (r) {
-    vm.name = vm.name ?? r.name ?? undefined;
-    vm.description = vm.description ?? r.description ?? undefined;
-    const ctx = (r as any)?.context_length;
-    vm.ctx = vm.ctx ?? (typeof ctx === "number" ? ctx : undefined);
-    vm.context = vm.context ?? (typeof ctx === "number" ? ctx : undefined);
-
-    // Free-Heuristik aus pricing
-    const p = (r as any)?.pricing;
-    const nums: number[] = [];
-    for (const k of ["prompt", "completion"]) {
-      const v = p?.[k];
-      if (typeof v === "number") nums.push(v);
-      else if (typeof v === "string") {
-        const f = parseFloat(v);
-        if (!Number.isNaN(f)) nums.push(f);
-      }
-    }
-    if (nums.length) {
-      const isFree = nums.every(n => n <= 0);
-      vm.free = vm.free || isFree;
-    }
-
-    // Fast-Heuristik
-    const rid = r.id.toLowerCase();
-    if (/turbo|small|mini|7b|8b/.test(rid)) vm.fast = vm.fast ?? true;
-  }
-  return vm;
-}
-
-/* -------------- Cache -------------- */
-type CacheBlob = { ts: number; data: OpenRouterModel[] };
-
-function readCache(ttlMin: number): OpenRouterModel[] | null {
-  try {
-    const raw = localStorage.getItem(LS_KEY);
-    if (!raw) return null;
-    const blob: CacheBlob = JSON.parse(raw);
-    if (!blob || typeof blob.ts !== "number" || !Array.isArray(blob.data)) return null;
-    const ageMin = (Date.now() - blob.ts) / 60000;
-    if (ageMin > ttlMin) return null;
-    return blob.data;
-  } catch { return null; }
-}
-function writeCache(data: OpenRouterModel[]) {
-  try {
-    const blob: CacheBlob = { ts: Date.now(), data };
-    localStorage.setItem(LS_KEY, JSON.stringify(blob));
-  } catch {}
+export async function fetchModelsOnce(apiKey?: string | null): Promise<OpenRouterModel[]> {
+  if (!apiKey) return [];
+  const client = new OpenRouterClient({ apiKey });
+  return await client.listModels();
 }

@@ -1,7 +1,9 @@
 /**
  * Robuster OpenRouter-Client mit JSON-Delta-Streaming.
- * Zusätzlich: Kompatibilitätsexporte `OpenRouterClient` und `sendChat`,
- * weil andere Module diese erwarten.
+ * Kompatibilität:
+ *  - export type OpenRouterModel
+ *  - export class OpenRouterClient { constructor(string | {apiKey}), send(): Promise<string>, listModels(): Promise<OpenRouterModel[]> }
+ *  - export function sendChat(...): Promise<string>
  */
 
 export type ChatMessage = { role: "system" | "user" | "assistant"; content: string };
@@ -21,6 +23,15 @@ export type SendOptions = {
   timeoutMs?: number;
 };
 
+export type OpenRouterModel = {
+  id: string;
+  name?: string;
+  context_length?: number;
+  pricing?: { prompt?: string; completion?: string };
+  description?: string;
+  caps?: Record<string, unknown>;
+};
+
 async function fetchWithTimeout(input: RequestInfo, init: RequestInit = {}, timeoutMs = 30000): Promise<Response> {
   const controller = new AbortController();
   const id = setTimeout(() => controller.abort(), timeoutMs);
@@ -31,16 +42,13 @@ async function fetchWithTimeout(input: RequestInfo, init: RequestInit = {}, time
   }
 }
 
-/**
- * Niedrigstufige API: Stream direkt starten.
- * Nutzt SSE ("data: ...") und extrahiert content aus common Feldern.
- */
-export async function streamChat(opts: SendOptions, cbs: StreamCallbacks = {}) {
+/** Niedrigstufige API: start Streaming; gibt den **akkumulierten** Text zurück (Promise<string>). */
+export async function streamChat(opts: SendOptions, cbs: StreamCallbacks = {}): Promise<string> {
   const { apiKey, model, messages, temperature = 0.7, signal, timeoutMs = 60000 } = opts;
 
   if (!apiKey) {
     cbs.onError?.("Kein API-Schlüssel gesetzt.");
-    return;
+    return "";
   }
 
   let res: Response;
@@ -53,21 +61,13 @@ export async function streamChat(opts: SendOptions, cbs: StreamCallbacks = {}) {
         "HTTP-Referer": location.origin,
         "X-Title": "ai_chatv2",
       },
-      body: JSON.stringify({
-        model,
-        messages,
-        temperature,
-        stream: true,
-      }),
+      body: JSON.stringify({ model, messages, temperature, stream: true }),
       signal,
     }, timeoutMs);
   } catch (e: any) {
-    if (e?.name === "AbortError") {
-      cbs.onError?.("Abgebrochen.");
-      return;
-    }
-    cbs.onError?.("Netzwerkfehler. Prüfe Verbindung.");
-    return;
+    if (e?.name === "AbortError") cbs.onError?.("Abgebrochen.");
+    else cbs.onError?.("Netzwerkfehler. Prüfe Verbindung.");
+    return "";
   }
 
   if (!res.ok || !res.body) {
@@ -76,12 +76,13 @@ export async function streamChat(opts: SendOptions, cbs: StreamCallbacks = {}) {
     if (status === 429) cbs.onError?.("Rate-Limit erreicht (429). Bitte kurz warten und erneut versuchen.");
     else if (status >= 500) cbs.onError?.("OpenRouter antwortet nicht stabil (5xx). Später erneut versuchen.");
     else cbs.onError?.(`Fehler ${status}: ${text || "Unbekannter Fehler"}`);
-    return;
+    return "";
   }
 
   const reader = res.body.getReader();
   const decoder = new TextDecoder("utf-8");
   let buffer = "";
+  let accum = "";
 
   try {
     while (true) {
@@ -99,7 +100,7 @@ export async function streamChat(opts: SendOptions, cbs: StreamCallbacks = {}) {
         const data = chunk.slice(5).trim();
         if (data === "[DONE]") {
           cbs.onDone?.();
-          return;
+          return accum;
         }
         try {
           const json = JSON.parse(data);
@@ -108,9 +109,15 @@ export async function streamChat(opts: SendOptions, cbs: StreamCallbacks = {}) {
             json?.choices?.[0]?.message?.content ??
             json?.content ??
             "";
-          if (piece) cbs.onToken?.(piece);
+          if (piece) {
+            accum += piece;
+            cbs.onToken?.(piece);
+          }
         } catch {
-          if (data && data !== "null") cbs.onToken?.(String(data));
+          if (data && data !== "null") {
+            accum += String(data);
+            cbs.onToken?.(String(data));
+          }
         }
       }
     }
@@ -120,16 +127,11 @@ export async function streamChat(opts: SendOptions, cbs: StreamCallbacks = {}) {
   } finally {
     cbs.onDone?.();
   }
+  return accum;
 }
 
-/* ------------------------------------------------------------------ */
-/* Kompatibilitätsschicht                                             */
-/* ------------------------------------------------------------------ */
+/* High-Level API kompatibel zu bestehendem Code */
 
-/**
- * Historische High-Level-Funktion, die von `lib/client.tsx` importiert wird.
- * Delegiert auf streamChat; akzeptiert eine Optionsstruktur mit Callbacks.
- */
 export async function sendChat(args: {
   apiKey: string;
   model: string;
@@ -140,26 +142,15 @@ export async function sendChat(args: {
   onToken?: (t: string) => void;
   onError?: (m: string) => void;
   onDone?: () => void;
-}) {
-  const {
-    apiKey, model, messages, temperature, signal, timeoutMs,
-    onToken, onError, onDone,
-  } = args;
-
-  return streamChat(
-    { apiKey, model, messages, temperature, signal, timeoutMs },
-    { onToken, onError, onDone }
-  );
+}): Promise<string> {
+  const { apiKey, model, messages, temperature, signal, timeoutMs, onToken, onError, onDone } = args;
+  return streamChat({ apiKey, model, messages, temperature, signal, timeoutMs }, { onToken, onError, onDone });
 }
 
-/**
- * Historische Klassen-API, die z. B. von `lib/catalog.ts` importiert wird.
- * Bietet `send()` und nutzt intern streamChat.
- */
 export class OpenRouterClient {
   private apiKey: string;
-  constructor(apiKey: string) {
-    this.apiKey = apiKey;
+  constructor(arg: string | { apiKey: string }) {
+    this.apiKey = typeof arg === "string" ? arg : arg?.apiKey;
   }
 
   async send(args: {
@@ -171,11 +162,18 @@ export class OpenRouterClient {
     onToken?: (t: string) => void;
     onError?: (m: string) => void;
     onDone?: () => void;
-  }) {
+  }): Promise<string> {
     const { model, messages, temperature, signal, timeoutMs, onToken, onError, onDone } = args;
-    return streamChat(
-      { apiKey: this.apiKey, model, messages, temperature, signal, timeoutMs },
-      { onToken, onError, onDone }
-    );
+    return streamChat({ apiKey: this.apiKey, model, messages, temperature, signal, timeoutMs }, { onToken, onError, onDone });
+  }
+
+  async listModels(): Promise<OpenRouterModel[]> {
+    const r = await fetch("https://openrouter.ai/api/v1/models", {
+      headers: { Authorization: `Bearer ${this.apiKey}` },
+    });
+    if (!r.ok) throw new Error(`Model-List Fehler ${r.status}`);
+    const j = await r.json().catch(() => ({}));
+    const arr: OpenRouterModel[] = Array.isArray(j.data) ? j.data : (Array.isArray(j.models) ? j.models : []);
+    return arr ?? [];
   }
 }

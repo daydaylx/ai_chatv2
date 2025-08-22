@@ -1,26 +1,31 @@
-import { defineConfig } from "vite";
-import react from "@vitejs/plugin-react";
-import { VitePWA } from "vite-plugin-pwa";
+import { defineConfig, loadEnv } from 'vite';
+import react from '@vitejs/plugin-react';
+import path from 'node:path';
 
-export default defineConfig({
-  plugins: [
-    react(),
-    VitePWA({
-      registerType: "autoUpdate",
-      selfDestroying: true, // PWA installierbar, aber kein Offline-Cache-Zirkus
-      manifest: {
-        name: "Disa AI",
-        short_name: "DisaAI",
-        start_url: "/",
-        display: "standalone",
-        background_color: "#0b0d10",
-        theme_color: "#0b0d10",
-        icons: [
-          { src: "/icons/icon-192.png", sizes: "192x192", type: "image/png" },
-          { src: "/icons/icon-512.png", sizes: "512x512", type: "image/png" }
-        ]
+// Hinweis: Service Worker wird über VITE_SW_MODE gesteuert:
+// - "on":    /sw.js registrieren
+// - "kill":  /sw-kill.js registrieren
+// - (leer):  kein Service Worker (Default)
+
+export default defineConfig(({ mode }) => {
+  const env = loadEnv(mode, process.cwd(), '');
+  return {
+    plugins: [react()],
+    define: {
+      __SW_MODE__: JSON.stringify(env.VITE_SW_MODE ?? '')
+    },
+    resolve: {
+      alias: {
+        '@': path.resolve(__dirname, 'src')
       }
-    })
-  ],
-  server: { port: 5173, host: true }
+    },
+    server: {
+      port: 5173,
+      strictPort: true
+    },
+    preview: {
+      port: 4173,
+      strictPort: true
+    }
+  };
 });

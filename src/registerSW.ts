@@ -1,39 +1,18 @@
-/**
- * Registriert den Service Worker und meldet "Update verfügbar".
- * AppShell lauscht auf window-Event 'sw:update'.
- * Keine Argumente erforderlich; Pfad ist hier festgelegt.
- */
-export function registerSW() {
-  if (!("serviceWorker" in navigator)) return;
+// Steuerung via VITE_SW_MODE:
+//  - 'on'   => registriert /sw.js (minimal, kein Caching)
+//  - 'kill' => registriert /sw-kill.js (einmalig Caches leeren & sich selbst abmelden)
+//  - ''     => kein Service Worker (Default, stabil)
 
-  window.addEventListener("load", () => {
-    navigator.serviceWorker.register("/sw.js").then((reg) => {
-      const notify = () => {
-        if (reg.waiting) {
-          window.dispatchEvent(new CustomEvent("sw:update", { detail: reg }));
-        }
-      };
-      reg.addEventListener("updatefound", () => {
-        const installing = reg.installing;
-        if (!installing) return;
-        installing.addEventListener("statechange", () => {
-          if (installing.state === "installed") notify();
-        });
-      });
-      // Bereits waiting?
-      notify();
+const SW_MODE = (typeof __SW_MODE__ !== 'undefined' ? __SW_MODE__ : '') as string;
 
-      // Controllerwechsel => Seite neu laden (nach SKIP_WAITING)
-      navigator.serviceWorker.addEventListener("controllerchange", () => {
-        window.location.reload();
-      });
-    }).catch(() => {
-      // stillschweigend ignorieren – offline/dev
+if ('serviceWorker' in navigator) {
+  if (SW_MODE === 'on') {
+    navigator.serviceWorker.register('/sw.js').catch((err) => {
+      console.error('[SW] register error:', err);
     });
-  });
-}
-
-// Utility um den SW sofort zu aktivieren (wird von AppShell aufgerufen)
-export function applySWUpdate(reg: ServiceWorkerRegistration) {
-  reg.waiting?.postMessage?.("SKIP_WAITING");
+  } else if (SW_MODE === 'kill') {
+    navigator.serviceWorker.register('/sw-kill.js').catch((err) => {
+      console.error('[SW-KILL] register error:', err);
+    });
+  }
 }

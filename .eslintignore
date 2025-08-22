@@ -1,8 +1,0 @@
-node_modules
-dist
-build
-coverage
-.vite
-*.config.cjs
-*.config.js
-public

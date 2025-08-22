@@ -1,47 +1,35 @@
-import type { ChatMsg } from "./chatStream";
+import { type ChatMsg, streamChat } from "./chatStream";
 
-export type Summary = { bullets: string[]; narrative: string; };
-
-export type SummarizeOpts = {
-  apiKey: string;
-  model: string;
-  history: ChatMsg[];
-  maxChars?: number;
-};
-
-export function shouldSummarize(history: ChatMsg[], maxChars = 4000): boolean {
-  const len = history.reduce((n, m) => n + m.content.length, 0);
-  return history.length >= 20 || len >= maxChars;
+export function shouldSummarize(history: ChatMsg[]): boolean {
+  if (history.length >= 20) return true;
+  const chars = history.map(m => m.content.length).reduce((a,b) => a + b, 0);
+  return chars > 4000;
 }
 
-export async function summarize(opts: SummarizeOpts): Promise<Summary> {
-  const sys = "Du bist ein präziser Summarizer. Fasse den Dialog in maximal 7 klaren Stichpunkten zusammen und gib zusätzlich eine kurze, neutrale Erzählzusammenfassung in 2–5 Sätzen. Antworte als JSON mit {\"bullets\": string[], \"narrative\": string}.";
-  const payload = {
-    model: opts.model,
-    stream: false,
-    messages: [
-      { role: "system", content: sys },
-      { role: "user", content: `Dialog:\n${serializeHistory(opts.history)}\n\nErzeuge NUR JSON.` }
-    ]
-  };
-  const res = await fetch("https://openrouter.ai/api/v1/chat/completions", {
-    method: "POST",
-    headers: { "Content-Type": "application/json", "Authorization": `Bearer ${opts.apiKey}` },
-    body: JSON.stringify(payload)
+export type SummarizeOpts = { apiKey: string; model: string; history: ChatMsg[]; };
+
+export async function summarize({ apiKey, model, history }: SummarizeOpts): Promise<{ bullets: string[]; narrative: string; }> {
+  const sys = "Fasse die Konversation äußerst knapp zusammen. Gib ein JSON der Form {\"bullets\": string[], \"narrative\": string}. Keine Erklärungen.";
+  const user = "Erzeuge die Zusammenfassung (max 6 kurze Stichpunkte, plus 2-3 Sätze).";
+  const msg: ChatMsg[] = [{ role: "user", content: user }];
+  let acc = "";
+  await streamChat({
+    apiKey, model, system: sys, messages: history.slice(-8).concat(msg),
+    maxTokensOut: 512,
+    onToken: (t) => { acc += t; },
+    onDone: () => {},
+    onError: (e) => { throw e; },
   });
-  if (!res.ok) throw new Error(`summarize failed ${res.status}`);
-  const data = await res.json();
-  const text = data.choices?.[0]?.message?.content ?? "{}";
   try {
-    const parsed = JSON.parse(text);
-    const bullets: string[] = Array.isArray(parsed.bullets) ? parsed.bullets.slice(0, 7).map(String) : [];
-    const narrative: string = typeof parsed.narrative === "string" ? parsed.narrative : "";
+    const start = acc.indexOf("{");
+    const end = acc.lastIndexOf("}");
+    const json = JSON.parse(acc.slice(start, end + 1));
+    const bullets: string[] = Array.isArray(json.bullets) ? json.bullets.map(String) : [];
+    const narrative: string = typeof json.narrative === "string" ? json.narrative : "";
     return { bullets, narrative };
   } catch {
-    return { bullets: [], narrative: "" };
+    // Fallback: naive Zerlegung
+    const parts = acc.split("\n").filter(Boolean).map(s => s.replace(/^[-•]\s?/, "").trim());
+    return { bullets: parts.slice(0,6), narrative: parts.slice(6).join(" ").slice(0,400) };
   }
-}
-
-function serializeHistory(h: ChatMsg[]): string {
-  return h.map(m => `${m.role.toUpperCase()}: ${m.content}`).join("\n");
 }

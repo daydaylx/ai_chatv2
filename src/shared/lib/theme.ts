@@ -1,25 +1,25 @@
 export type Accent = "violet" | "amber" | "jade" | "blue";
-const LS_KEY = "ui.accent";
+const LS_KEY = "accent-theme";
 
-export function initAccent(defaultAccent: Accent = "violet") {
-  const stored = safeRead(LS_KEY) as Accent | null;
-  const acc = (stored ?? defaultAccent);
-  document.documentElement.dataset.accent = acc;
+const palettes: Record<Accent, string> = {
+  violet: "262 84% 60%",
+  amber: "38 96% 55%",
+  jade: "160 90% 44%",
+  blue: "216 98% 60%",
+};
+
+export function initAccent(defaultAccent: Accent) {
+  const a = (localStorage.getItem(LS_KEY) as Accent) || defaultAccent;
+  setAccent(a);
 }
 
-export function setAccent(accent: Accent) {
-  safeWrite(LS_KEY, accent);
-  document.documentElement.dataset.accent = accent;
+export function setAccent(a: Accent) {
+  localStorage.setItem(LS_KEY, a);
+  const root = document.documentElement;
+  root.style.setProperty("--accent-600-hsl", palettes[a]);
+  root.style.setProperty("--accent-600", palettes[a]);
 }
 
-export function getAccent(fallback: Accent = "violet"): Accent {
-  const d = (document.documentElement.dataset.accent as Accent | undefined);
-  return d ?? (safeRead(LS_KEY) as Accent | null) ?? fallback;
-}
-
-function safeRead(k: string): string | null {
-  try { return localStorage.getItem(k); } catch { return null; }
-}
-function safeWrite(k: string, v: string) {
-  try { localStorage.setItem(k, v); } catch { /* ignore */ }
+export function getAccent(): Accent {
+  return (localStorage.getItem(LS_KEY) as Accent) || "violet";
 }

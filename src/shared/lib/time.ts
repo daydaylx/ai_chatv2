@@ -1,17 +1,11 @@
-export function formatRelative(ts: number): string {
-  const now = Date.now();
-  const d = Math.max(0, now - ts);
-  const sec = Math.floor(d / 1000);
-  if (sec < 10) return "gerade eben";
-  if (sec < 60) return `vor ${sec}s`;
-  const min = Math.floor(sec / 60);
-  if (min < 60) return `vor ${min}m`;
-  const h = Math.floor(min / 60);
-  if (h < 24) return `vor ${h}h`;
-  const day = Math.floor(h / 24);
-  if (day === 1) return "gestern";
-  if (day < 7) return `vor ${day} Tagen`;
-  // Fallback: Datum kurz
-  const dt = new Date(ts);
-  return dt.toLocaleDateString("de-DE", { year: "numeric", month: "2-digit", day: "2-digit" });
+const rtf = new Intl.RelativeTimeFormat("de", { numeric: "auto" });
+export function formatRelative(ms: number): string {
+  const diff = ms - Date.now();
+  const abs = Math.abs(diff);
+  const mins = Math.round(abs / 60000);
+  if (mins < 60) return rtf.format(Math.round(diff / 60000), "minute");
+  const hours = Math.round(abs / 3600000);
+  if (hours < 24) return rtf.format(Math.round(diff / 3600000), "hour");
+  const days = Math.round(abs / 86400000);
+  return rtf.format(Math.round(diff / 86400000), "day");
 }

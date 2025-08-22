@@ -1,40 +1,46 @@
 import * as React from "react";
-import type { OpenRouterModel } from "./openrouter";
-import { listModels } from "./openrouter";
+import { fetchModels, type ORModel } from "./openrouter";
 
-export type CatalogState = {
-  models: OpenRouterModel[];
-  loading: boolean;
-  error: string | null;
-  refresh: () => void;
+export type CatalogModel = {
+  id: string;
+  name?: string;
+  description?: string;
+  tags?: string[];
+  free?: boolean;
+  fast?: boolean;
+  allow_nsfw?: boolean;
 };
 
-type UseCatalogOpts = { local?: OpenRouterModel[]; apiKey?: string | null };
-
-export function useModelCatalog(opts?: UseCatalogOpts): CatalogState {
-  const local = React.useMemo<OpenRouterModel[]>(() => opts?.local ?? [], [JSON.stringify(opts?.local ?? [])]);
-  const apiKey = opts?.apiKey ?? null;
-
-  const [models, setModels] = React.useState<OpenRouterModel[]>(local);
+export function useModelCatalog({ local, apiKey }: { local: CatalogModel[]; apiKey: string | null; }) {
+  const [models, setModels] = React.useState<CatalogModel[]>(local ?? []);
   const [loading, setLoading] = React.useState(false);
   const [error, setError] = React.useState<string | null>(null);
 
+  const normalize = (m: ORModel): CatalogModel => {
+    const id = m.id;
+    const name = m.name ?? m.id;
+    const description = m.description ?? "";
+    const tags = m.tags ?? [];
+    const free = /free|trial|open|test/i.test([id, name, description, tags.join(",")].join(" "));
+    const fast = /fast|turbo|small|mini/i.test([id, name, description, tags.join(",")].join(" "));
+    const allow_nsfw = /nsfw|uncensored|anything/i.test([id, name, description, tags.join(",")].join(" "));
+    return { id, name, description, tags, free, fast, allow_nsfw };
+  };
+
   const load = React.useCallback(async () => {
+    if (!apiKey) { setModels(local ?? []); setError(null); return; }
     setLoading(true); setError(null);
     try {
-      if (!apiKey) { setModels(local); return; }
-      const remote = await listModels(apiKey);
-      // Merge: Remote priorisiert, lokale ergänzen falls IDs fehlen
-      const ids = new Set(remote.map(m => m.id));
-      const add = local.filter(m => !ids.has(m.id));
-      setModels([...remote, ...add]);
+      const list = await fetchModels(apiKey);
+      const norm = list.map(normalize);
+      setModels(norm);
     } catch (e: any) {
-      setError(e?.message || String(e));
-      setModels(local);
+      setError(e?.message ?? "Fehler beim Laden");
+      setModels(local ?? []);
     } finally {
       setLoading(false);
     }
-  }, [apiKey, JSON.stringify(local)]);
+  }, [apiKey, local]);
 
   React.useEffect(() => { void load(); }, [load]);
 

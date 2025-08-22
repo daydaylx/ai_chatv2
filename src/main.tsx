@@ -1,15 +1,15 @@
 import React from "react";
 import ReactDOM from "react-dom/client";
 import App from "./App";
-import "./styles/globals.css";
+import { ClientProvider } from "./lib/client";
+import { PersonaProvider } from "./entities/persona";
 
-const root = document.getElementById("root");
-if (!root) {
-  throw new Error("ROOT element #root fehlt in index.html");
-}
-
-ReactDOM.createRoot(root).render(
+ReactDOM.createRoot(document.getElementById("root")!).render(
   <React.StrictMode>
-    <App />
+    <ClientProvider>
+      <PersonaProvider>
+        <App />
+      </PersonaProvider>
+    </ClientProvider>
   </React.StrictMode>
 );

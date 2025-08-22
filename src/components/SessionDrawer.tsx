@@ -4,13 +4,9 @@ import Button from "../shared/ui/Button";
 import { useSession } from "../entities/session/store";
 import { formatRelative } from "../shared/lib/time";
 
-type Props = {
-  open: boolean;
-  onOpenChange: (v: boolean) => void;
-  className?: string;
-};
+type Props = { open: boolean; onOpenChange: (v: boolean) => void; };
 
-export default function SessionDrawer({ open, onOpenChange, className }: Props) {
+export default function SessionDrawer({ open, onOpenChange }: Props) {
   const sess = useSession();
 
   const onNew = async () => { await sess.newSession(); };
@@ -26,7 +22,7 @@ export default function SessionDrawer({ open, onOpenChange, className }: Props) 
   };
 
   return (
-    <Sheet open={open} onOpenChange={onOpenChange} title="Sessions" className={className ?? ""}>
+    <Sheet open={open} onOpenChange={onOpenChange} title="Sessions" className="glass-sheet">
       <div className="grid gap-3">
         <div className="flex justify-between items-center">
           <div className="text-sm text-white/70">{sess.sessions.length} gespeichert</div>
@@ -39,12 +35,7 @@ export default function SessionDrawer({ open, onOpenChange, className }: Props) 
             return (
               <div key={s.id} className={["p-3 sm:p-3.5 hover-lift transition-transform", active ? "bg-white/[0.06]" : "bg-transparent"].join(" ")}>
                 <div className="flex items-start gap-3">
-                  <button
-                    onClick={() => onSwitch(s.id)}
-                    className="flex-1 text-left min-w-0"
-                    aria-current={active ? "true" : "false"}
-                    title={s.title}
-                  >
+                  <button onClick={() => onSwitch(s.id)} className="flex-1 text-left min-w-0" aria-current={active ? "true" : "false"} title={s.title}>
                     <div className="truncate font-medium">{s.title || "Unbenannt"}</div>
                     <div className="text-xs text-white/60">{formatRelative(s.updatedAt)}</div>
                   </button>
@@ -56,9 +47,7 @@ export default function SessionDrawer({ open, onOpenChange, className }: Props) 
               </div>
             );
           })}
-          {sess.sessions.length === 0 && (
-            <div className="p-3 text-sm text-white/70">Keine Sessions vorhanden.</div>
-          )}
+          {sess.sessions.length === 0 && (<div className="p-3 text-sm text-white/70">Keine Sessions vorhanden.</div>)}
         </div>
       </div>
     </Sheet>

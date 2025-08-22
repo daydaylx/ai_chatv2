@@ -1,130 +1,24 @@
-/* ---------- GLASS THEME (leicht, performant, keine externen Assets) ---------- */
-
-/* Hintergrund: zwei weiche radiale Akzent-Spots + subtile "Noise"-Textur zur Banding-Reduktion */
+/* ---------- GLASS THEME ---------- */
 :root {
-  /* Falls deine Theme-Variablen schon existieren, nutzen wir sie; sonst fallbacken wir */
-  --glass-bg: hsl(var(--surface-0, 240 10% 6%));
-  --glass-spot: hsla(var(--accent-600-hsl, 255 90% 60%), 0.22);
-  --glass-spot-2: hsla(var(--accent-600-hsl, 255 90% 60%), 0.18);
+  --glass-bg: hsl(240 10% 6%);
+  --glass-spot: hsla(255 90% 60%, 0.22);
+  --glass-spot-2: hsla(255 90% 60%, 0.18);
   --glass-border: rgba(255,255,255,0.12);
   --glass-fill: rgba(255,255,255,0.05);
-  --glass-fill-strong: rgba(255,255,255,0.08);
-  --glass-inner: rgba(255,255,255,0.08);
-  --glass-shadow: rgba(0,0,0,0.45);
-  --glass-ring: hsla(var(--accent-600-hsl, 255 90% 60%), 0.6);
 }
-
 .glass-bg {
-  position: fixed;
-  inset: 0;
-  pointer-events: none;
-  z-index: 0;
+  position: fixed; inset: 0; z-index: 0;
   background:
     radial-gradient(1200px 800px at 20% 5%, var(--glass-spot), transparent 60%),
     radial-gradient(1000px 700px at 85% 10%, var(--glass-spot-2), transparent 60%),
     linear-gradient(var(--glass-bg), var(--glass-bg));
 }
-
 .glass-noise {
-  position: fixed;
-  inset: 0;
-  pointer-events: none;
-  z-index: 0;
-  opacity: .18;
-  mix-blend-mode: soft-light;
-  /* Günstige Fake-Noise aus zwei überlagerten repeating-linear-gradients */
-  background-image:
-    repeating-linear-gradient(0deg, rgba(255,255,255,0.03) 0 2px, transparent 2px 4px),
-    repeating-linear-gradient(90deg, rgba(255,255,255,0.03) 0 2px, transparent 2px 4px);
-  filter: contrast(110%) saturate(110%);
+  position: fixed; inset: 0; z-index: 0;
+  opacity: .18; mix-blend-mode: soft-light;
 }
-
-/* Glass-Karten/Bubbles */
 .glass-card {
   background: var(--glass-fill);
-  -webkit-backdrop-filter: blur(10px) saturate(110%);
-  backdrop-filter: blur(10px) saturate(110%);
   border: 1px solid var(--glass-border);
-  box-shadow:
-    0 8px 28px var(--glass-shadow),
-    inset 0 1px 0 var(--glass-inner);
   border-radius: 16px;
-}
-
-.glass-sheet {
-  background: var(--glass-fill-strong);
-  -webkit-backdrop-filter: blur(14px) saturate(120%);
-  backdrop-filter: blur(14px) saturate(120%);
-  border: 1px solid var(--glass-border);
-  box-shadow:
-    0 20px 60px var(--glass-shadow),
-    inset 0 1px 0 var(--glass-inner);
-  border-radius: 18px;
-}
-
-.glass-header {
-  background: linear-gradient(to bottom, rgba(255,255,255,0.04), rgba(255,255,255,0.02));
-  -webkit-backdrop-filter: blur(10px) saturate(110%);
-  backdrop-filter: blur(10px) saturate(110%);
-  border-bottom: 1px solid var(--glass-border);
-  box-shadow: inset 0 1px 0 var(--glass-inner);
-}
-
-.bubble-assistant {
-  background: var(--glass-fill);
-  -webkit-backdrop-filter: blur(8px) saturate(115%);
-  backdrop-filter: blur(8px) saturate(115%);
-  border: 1px solid var(--glass-border);
-  box-shadow:
-    0 6px 18px var(--glass-shadow),
-    inset 0 1px 0 rgba(255,255,255,0.06);
-}
-
-.bubble-user {
-  background: hsla(var(--accent-600-hsl, 255 90% 60%), 0.92);
-  color: #0b0b0b;
-  box-shadow:
-    0 8px 24px hsla(var(--accent-600-hsl, 255 90% 60%), 0.35),
-    inset 0 1px 0 rgba(255,255,255,0.35);
-  border: 1px solid hsla(var(--accent-600-hsl, 255 90% 60%), 0.55);
-}
-
-/* Fokus-/Hover-Ringe für interaktive Elemente */
-.glow-ring {
-  box-shadow:
-    0 0 0 1px var(--glass-border),
-    0 0 0 0px var(--glass-ring);
-  transition: box-shadow 160ms ease, transform 160ms ease;
-}
-.glow-ring:hover {
-  transform: translateY(-1px);
-  box-shadow:
-    0 0 0 1px var(--glass-border),
-    0 6px 18px var(--glass-ring);
-}
-.glow-ring:focus-visible {
-  outline: none;
-  box-shadow:
-    0 0 0 2px rgba(255,255,255,0.4),
-    0 0 0 6px var(--glass-ring);
-}
-
-/* Kleinere Badges/Pills */
-.pill {
-  border: 1px solid var(--glass-border);
-  background: rgba(255,255,255,0.05);
-  -webkit-backdrop-filter: blur(6px) saturate(110%);
-  backdrop-filter: blur(6px) saturate(110%);
-  border-radius: 9999px;
-  padding: 2px 8px;
-  font-size: 11px;
-  line-height: 1;
-}
-
-/* Utility: leichtes „Lift“-Hover */
-.hover-lift {
-  transition: transform 160ms ease, box-shadow 160ms ease;
-}
-.hover-lift:hover {
-  transform: translateY(-1px);
 }

@@ -40,10 +40,7 @@ export default function SettingsSheet({ open, onOpenChange, className }: Props) 
     const s = q.trim().toLowerCase();
     if (!s) return filtered;
     return filtered.filter(m =>
-      [m.id, m.name ?? "", m.description ?? "", ...(m.tags ?? [])]
-        .join(" ")
-        .toLowerCase()
-        .includes(s)
+      [m.id, m.name ?? "", m.description ?? "", ...(m.tags ?? [])].join(" ").toLowerCase().includes(s)
     );
   }, [catalog.models, q, fFree, fNSFW, fFast, rule]);
 
@@ -86,10 +83,7 @@ export default function SettingsSheet({ open, onOpenChange, className }: Props) 
           <section className="grid gap-2 mt-3">
             <h3 className="text-sm font-semibold">Verfügbare Modelle {rule ? <span className="text-xs text-white/60">(gefiltert durch Stil)</span> : null}</h3>
             <ModelPicker
-              models={models.map(m => ({
-                id: m.id, label: m.name ?? m.id, description: m.description ?? "",
-                free: !!m.free, allow_nsfw: !!m.allow_nsfw, fast: !!m.fast
-              }))}
+              models={models.map(m => ({ id: m.id, label: m.name ?? m.id, description: m.description ?? "", free: !!m.free, allow_nsfw: !!m.allow_nsfw, fast: !!m.fast }))}
               selectedId={settings.modelId ?? undefined}
               onSelect={(id) => settings.setModelId(id)}
               compact
@@ -137,12 +131,7 @@ export default function SettingsSheet({ open, onOpenChange, className }: Props) 
 
               <div className="grid gap-1">
                 <div className="text-sm font-medium">Summarizer-Modell (optional)</div>
-                <Input
-                  placeholder="z. B. mistral-small oder llama-3.1-8b"
-                  value={settings.summarizerModelId ?? ""}
-                  onChange={(e) => settings.setSummarizerModelId(e.target.value || null)}
-                  aria-label="Summarizer-Modell"
-                />
+                <Input placeholder="z. B. mistral-small oder llama-3.1-8b" value={settings.summarizerModelId ?? ""} onChange={(e) => settings.setSummarizerModelId(e.target.value || null)} aria-label="Summarizer-Modell" />
                 <div className="text-xs text-white/60">Leer lassen, um das Hauptmodell zu verwenden.</div>
               </div>
             </div>
@@ -162,7 +151,6 @@ export default function SettingsSheet({ open, onOpenChange, className }: Props) 
   );
 }
 
-/** Minimaler Tabs-Wrapper */
 function Tabs({ children }: { children: React.ReactNode }) {
   const [i, setI] = React.useState(0);
   const items = React.Children.toArray(children) as React.ReactElement[];
@@ -170,7 +158,7 @@ function Tabs({ children }: { children: React.ReactNode }) {
     <div className="grid gap-3">
       <div className="flex gap-2">
         {items.map((it, idx) => (
-          <button key={idx} onClick={() => setI(idx)} className={["h-9 px-3 rounded-full border border-white/12 text-sm glow-ring", idx===i ? "bg-[hsl(var(--accent-600))]/20 ring-2 ring-[hsl(var(--accent-600))]" : "hover:bg-white/6"].join(" ")}>{it.props.title}</button>
+          <button key={idx} onClick={() => setI(idx)} className={["h-9 px-3 rounded-full border border-white/12 text-sm glow-ring", idx===i ? "bg-[hsl(var(--accent-600))]/20 ring-2 ring-[hsl(var(--accent-600))]" : "hover:bg-white/6"].join(" ")}>{(it.props as any).title}</button>
         ))}
       </div>
       <div>{items[i]}</div>

@@ -1,7 +1,6 @@
-export function nanoid(size = 21): string {
-  const chars = "0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ_abcdefghijklmnopqrstuvwxyz-";
+export function nanoid(size: number = 12): string {
+  const chars = "0123456789abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ";
   let id = "";
-  const bytes = crypto.getRandomValues(new Uint8Array(size));
-  for (let i = 0; i < size; i++) id += chars[bytes[i] & 63];
+  crypto.getRandomValues(new Uint8Array(size)).forEach(n => id += chars[n % chars.length]);
   return id;
 }

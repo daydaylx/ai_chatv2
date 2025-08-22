@@ -1,30 +1,40 @@
 import type { PersonaModel } from "../entities/persona";
 
-export type Filter = {
-  free?: boolean;
-  allow_nsfw?: boolean;
-  fast?: boolean;
-};
-
-function nameOf(m: PersonaModel): string {
-  return (m.name ?? m.label ?? m.id).toLowerCase();
+/** Anzeigename eines Modells (fallback auf id). */
+export function modelLabel(m: PersonaModel): string {
+  return (m.name?.trim() || m.id).trim();
 }
 
-export function sortModels(models: PersonaModel[], favs: Record<string, true>): PersonaModel[] {
-  return [...models].sort((a, b) => {
-    const fa = !!favs[a.id], fb = !!favs[b.id];
-    if (fa !== fb) return fa ? -1 : 1;
-    const af = !!a.free, bf = !!b.free;
-    if (af !== bf) return af ? -1 : 1;
-    return nameOf(a).localeCompare(nameOf(b));
-  });
+/** Kleinschreib-Schlüssel für Vergleiche/Sortierung. */
+export function modelKey(m: PersonaModel): string {
+  return modelLabel(m).toLowerCase();
 }
 
-export function filterModels(models: PersonaModel[], f: Filter): PersonaModel[] {
-  return models.filter((m) => {
-    if (f.free === true && !m.free) return false;
-    if (f.allow_nsfw === true && !m.allow_nsfw) return false;
-    if (f.fast === true && !m.fast) return false;
-    return true;
-  });
+/** Volltext-Blob für Suche/Filter. */
+export function modelBlob(m: PersonaModel): string {
+  return [m.id, m.name ?? "", m.description ?? "", ...(m.tags ?? [])]
+    .join(" ")
+    .toLowerCase();
 }
+
+/** Einfache Textsuche gegen id/name/description/tags. */
+export function matchesModelQuery(m: PersonaModel, q: string): boolean {
+  const s = q.trim().toLowerCase();
+  if (!s) return true;
+  return modelBlob(m).includes(s);
+}
+
+/** Flag-Filter in einem Rutsch anwenden. */
+export type ModelFlags = { free?: boolean; fast?: boolean; allow_nsfw?: boolean };
+export function hasFlags(m: PersonaModel, f: ModelFlags): boolean {
+  if (f.free && !m.free) return false;
+  if (f.fast && !m.fast) return false;
+  if (f.allow_nsfw && !m.allow_nsfw) return false;
+  return true;
+}
+
+/* ---- Aliase für mögliche Alt-Imports (Abwärtskompatibilität) ---- */
+export const labelOf = modelLabel;
+export const keyOf = modelKey;
+export const blobOf = modelBlob;
+export const matchesQuery = matchesModelQuery;

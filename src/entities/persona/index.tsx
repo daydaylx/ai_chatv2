@@ -1,17 +1,25 @@
 import * as React from "react";
 
-export type Style = { id: string; name: string; description?: string; system?: string };
+export type Style = {
+  id: string;
+  name: string;
+  description?: string;
+  system?: string;
+};
+
+export type PersonaModel = {
+  id: string;
+  name?: string;
+  description?: string;
+  tags?: string[];
+  free?: boolean;
+  fast?: boolean;
+  allow_nsfw?: boolean;
+};
+
 export type PersonaData = {
   styles: Style[];
-  models: Array<{
-    id: string;
-    name?: string;
-    description?: string;
-    tags?: string[];
-    free?: boolean;
-    fast?: boolean;
-    allow_nsfw?: boolean;
-  }>;
+  models: PersonaModel[];
 };
 
 const defaultData: PersonaData = {

@@ -1,5 +1,8 @@
 /* ---------- PAPER THEME (ruhig, warm) ---------- */
 :root{
+  /* FEHLTE BEI DIR → darum war Textfarbe ungültig */
+  --white: 0 0% 100%;
+
   --paper-bg: hsl(220 14% 10%);
   --paper-spot: hsla(35 80% 55% / 0.10);
   --paper-spot-2: hsla(260 70% 60% / 0.08);
@@ -26,7 +29,7 @@
 .glass-header{background:linear-gradient(to bottom,rgba(255,255,255,0.035),rgba(255,255,255,0.02));
   border-bottom:1px solid var(--paper-border);color:var(--paper-ink);}
 .bubble-assistant{background:var(--paper-fill);border:1px solid var(--paper-border);color:var(--paper-ink);}
-.bubble-user{background:color-mix(in oklab,hsl(var(--accent-600-hsl,255 90% 60%)) 85%,white 15%);color:#0b0b0b;
+.bubble-user{background:color-mix(in oklab,hsl(var(--accent-600-hsl,255 90% 60%)) 85%, white 15%);color:#0b0b0b;
   border:1px solid hsla(var(--accent-600-hsl,255 90% 60%),0.45);}
 .pill{border:1px solid var(--paper-border);background:rgba(255,255,255,0.045);border-radius:9999px;padding:2px 8px;font-size:11px;line-height:1;color:var(--paper-ink);}
 .glow-ring{box-shadow:0 0 0 1px var(--paper-border),0 0 0 0 var(--paper-ring);transition:box-shadow 160ms ease,transform 160ms ease;}

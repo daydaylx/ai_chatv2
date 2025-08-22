@@ -3,7 +3,6 @@ import Header from "../../components/Header";
 import SettingsSheet from "../../features/settings/SettingsSheet";
 import SessionDrawer from "../../components/SessionDrawer";
 import { initAccent } from "../../shared/lib/theme";
-/* PAPER-Theme (Standard). GLASS optional zusätzlich importierbar. */
 import "../../shared/styles/paper.css";
 
 export function AppShell({ children }: { children: React.ReactNode }) {
@@ -13,8 +12,8 @@ export function AppShell({ children }: { children: React.ReactNode }) {
   React.useEffect(() => { initAccent("amber"); }, []);
 
   return (
-    <div className="relative min-h-[100svh] text-[hsl(var(--white))] bg-transparent">
-      {/* Hintergrund-Layer */}
+    <div className="relative min-h-[100svh] text-white bg-transparent">
+      {/* Paper-Hintergrund (Spots + Grain) */}
       <div className="glass-bg" aria-hidden />
       <div className="glass-noise" aria-hidden />
 
@@ -24,7 +23,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
         {children}
       </main>
 
-      {/* Sheets/Drawer */}
+      {/* Sheets / Drawer */}
       <SettingsSheet open={openSettings} onOpenChange={setOpenSettings} />
       <SessionDrawer open={openSessions} onOpenChange={setOpenSessions} />
     </div>

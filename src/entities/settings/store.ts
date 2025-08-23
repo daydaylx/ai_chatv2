@@ -66,7 +66,7 @@ const initialState: SettingsState = {
   language: "de",
   modelId: undefined,
   activeModelId: undefined,
-  personaId: undefined,
+  personaId: "neutral",
   autoSummarize: false,
   autoMemory: false,
   summarizerModelId: null,
@@ -85,7 +85,7 @@ export const useSettingsStore = create<SettingsState & SettingsActions>((set, ge
   setActiveModel: (id) =>
     set(() => ({ activeModelId: id, modelId: id })),
 
-  setPersonaId: (id) => set(() => ({ personaId: id })),
+  setPersonaId: (id) => set(() => ({ personaId: id === null ? undefined : id })),
 
   setFilters: (next) => set({ filters: { ...get().filters, ...next } }),
 

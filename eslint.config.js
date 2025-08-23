@@ -8,6 +8,9 @@ import tsparser from "@typescript-eslint/parser";
 export default [
   js.configs.recommended,
   {
+    ignores: ["dist/**/*", "node_modules/**/*", "public/**/*", "scripts/**/*"],
+  },
+  {
     files: ["**/*.{js,jsx,ts,tsx,mjs}"],
     languageOptions: {
       ecmaVersion: "latest",
@@ -23,10 +26,29 @@ export default [
         performance: "readonly",
         setTimeout: "readonly",
         clearTimeout: "readonly",
+        setInterval: "readonly",
+        clearInterval: "readonly",
         setImmediate: "readonly",
         MessageChannel: "readonly",
         MutationObserver: "readonly",
         MSApp: "readonly",
+        localStorage: "readonly",
+        crypto: "readonly",
+        indexedDB: "readonly",
+        IDBDatabase: "readonly",
+        IDBObjectStore: "readonly",
+        IDBKeyRange: "readonly",
+        IDBTransactionMode: "readonly",
+        URL: "readonly",
+        location: "readonly",
+        HTMLElement: "readonly",
+        HTMLDivElement: "readonly",
+        HTMLButtonElement: "readonly",
+        HTMLInputElement: "readonly",
+        HTMLAttributes: "readonly",
+        HTMLTextAreaElement: "readonly",
+        AbortSignal: "readonly",
+        TextDecoder: "readonly",
         // Node globals
         process: "readonly",
         __dirname: "readonly",
@@ -55,14 +77,6 @@ export default [
       "getter-return": "off",
       "no-misleading-character-class": "off",
       "no-useless-escape": "off"
-    }
-  },
-  {
-    files: ["dist/**/*"],
-    rules: {
-      "no-undef": "off",
-      "no-unused-vars": "off",
-      "no-prototype-builtins": "off"
     }
   }
 ];

@@ -11,7 +11,7 @@ describe("Button", () => {
 
   it("setzt Variant-Klassen (primary)", () => {
     const html = ReactDOMServer.renderToString(<Button variant="primary">OK</Button>);
-    // Grobe Prüfung auf eine der Variant-Klassen
-    expect(html).toMatch(/bg-primary/);
+    // Prüfung auf die tatsächliche CSS-Klasse
+    expect(html).toMatch(/bg-\[hsl\(var\(--accent-600\)\)\]/);
   });
 });

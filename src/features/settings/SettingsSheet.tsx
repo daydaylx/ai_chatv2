@@ -26,7 +26,7 @@ export default function SettingsSheet({ open, onOpenChange, className }: Props) 
   const [fNSFW, setFNSFW] = React.useState(false);
   const [fFast, setFFast] = React.useState(false);
 
-  const rule = React.useMemo(() => ruleForStyle(settings.personaId), [settings.personaId]);
+  const rule = React.useMemo(() => ruleForStyle(settings.personaId || null), [settings.personaId]);
 
   const models = React.useMemo(() => {
     const all = catalog.models;

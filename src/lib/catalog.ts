@@ -1,13 +1,15 @@
+/* eslint-env browser */
 import * as React from "react";
 
-/** Modelltyp so definieren, wie SettingsSheet ihn nutzt */
+const AC = globalThis.AbortController;
+type ACType = InstanceType<typeof AC>;
+
 export type OpenRouterModel = {
   id: string;
   name?: string;
   description?: string;
   context_length?: number;
   pricing?: { prompt?: string; completion?: string };
-  /** Zusätzliche, im UI verwendete Flags (optional, defensiv) */
   free?: boolean;
   allow_nsfw?: boolean;
   fast?: boolean;
@@ -30,7 +32,6 @@ type UseCatalogOpts = {
   apiKey?: string | null;
 };
 
-/** Einmalig die OpenRouter-Modelle per fetch laden (ohne Abhängigkeit zu openrouter.ts) */
 async function fetchOpenRouterModels(apiKey: string): Promise<OpenRouterModel[]> {
   if (!apiKey) return [];
   const r = await fetch("https://openrouter.ai/api/v1/models", {
@@ -38,7 +39,7 @@ async function fetchOpenRouterModels(apiKey: string): Promise<OpenRouterModel[]>
       "Authorization": `Bearer ${apiKey}`,
       "HTTP-Referer": location.origin,
       "X-Title": "Disa AI",
-      "Content-Type": "application/json"
+      "Content-Type": "application/json",
     },
     cache: "no-store",
   });
@@ -46,41 +47,37 @@ async function fetchOpenRouterModels(apiKey: string): Promise<OpenRouterModel[]>
   const j = await r.json();
   const raw = Array.isArray(j) ? j : (Array.isArray(j?.data) ? j.data : []);
 
-  return raw.map((m: any) => {
-    const model: OpenRouterModel = {
-      id: String(m?.id ?? m?.name ?? ""),
-      name: typeof m?.name === "string" ? m.name : undefined,
-      description: typeof m?.description === "string" ? m.description : undefined,
-      context_length: typeof m?.context_length === "number" ? m.context_length : undefined,
-      pricing: m?.pricing && typeof m.pricing === "object"
-        ? {
-            prompt: typeof m.pricing.prompt === "string" ? m.pricing.prompt : undefined,
-            completion: typeof m.pricing.completion === "string" ? m.pricing.completion : undefined,
-          }
-        : undefined,
-      free: !!m?.free,
-      allow_nsfw: !!m?.allow_nsfw,
-      fast: !!m?.fast,
-      tags: Array.isArray(m?.tags) ? m.tags.filter((t: any) => typeof t === "string") : undefined,
-    };
-    return model;
-  }).filter((m: OpenRouterModel) => !!m.id);
+  return raw.map((m: any) => ({
+    id: String(m?.id ?? m?.name ?? ""),
+    name: typeof m?.name === "string" ? m.name : undefined,
+    description: typeof m?.description === "string" ? m.description : undefined,
+    context_length: typeof m?.context_length === "number" ? m.context_length : undefined,
+    pricing: m?.pricing && typeof m.pricing === "object"
+      ? {
+          prompt: typeof m.pricing.prompt === "string" ? m.pricing.prompt : undefined,
+          completion: typeof m.pricing.completion === "string" ? m.pricing.completion : undefined,
+        }
+      : undefined,
+    free: !!m?.free,
+    allow_nsfw: !!m?.allow_nsfw,
+    fast: !!m?.fast,
+    tags: Array.isArray(m?.tags) ? m.tags.filter((t: any) => typeof t === "string") : undefined,
+  })).filter((m: OpenRouterModel) => !!m.id);
 }
 
 export function useModelCatalog(opts?: UseCatalogOpts): CatalogState {
-  // Stabil: local & apiKey separat memoizen (vermeidet exhaustive-deps-Warnungen)
   const localInput = opts?.local;
   const local = React.useMemo<OpenRouterModel[]>(() => localInput ?? [], [localInput]);
 
-  const apiKeyInput = opts?.apiKey ?? null;
-  const apiKey = React.useMemo<string>(() => (apiKeyInput ?? "") || "", [apiKeyInput]);
+  const apiKeyIn = opts?.apiKey ?? null;
+  const apiKey = React.useMemo<string>(() => (apiKeyIn ?? "") || "", [apiKeyIn]);
 
   const [models, setModels] = React.useState<OpenRouterModel[]>(local);
-  const [loading, setLoading] = React.useState<boolean>(false);
+  const [loading, setLoading] = React.useState(false);
   const [error, setError] = React.useState<string | null>(null);
   const [status, setStatus] = React.useState<CatalogStatus>(local.length ? "ready" : "idle");
 
-  const abortRef = React.useRef<AbortController | null>(null);
+  const abortRef = React.useRef<ACType | null>(null);
 
   const load = React.useCallback(async () => {
     if (!apiKey) {
@@ -91,8 +88,9 @@ export function useModelCatalog(opts?: UseCatalogOpts): CatalogState {
       return;
     }
 
+    // vorherigen Lauf abbrechen
     abortRef.current?.abort();
-    const ac = new AbortController();
+    const ac = new AC();
     abortRef.current = ac;
 
     setLoading(true);
@@ -117,13 +115,13 @@ export function useModelCatalog(opts?: UseCatalogOpts): CatalogState {
     }
   }, [apiKey, local]);
 
-  // Lokale Modelle spiegeln, wenn sich 'local' ändert
+  // Wenn lokale Models sich ändern, UI sofort updaten
   React.useEffect(() => {
     setModels(local);
     setStatus(local.length ? "ready" : "idle");
   }, [local]);
 
-  // Remote laden, wenn apiKey vorhanden/ändert
+  // Wenn apiKey vorhanden/ändert, remote laden
   React.useEffect(() => {
     if (!apiKey) return;
     void load();

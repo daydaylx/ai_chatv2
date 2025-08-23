@@ -6,6 +6,6 @@ export function formatRelative(ms: number): string {
   if (mins < 60) return rtf.format(Math.round(diff / 60000), "minute");
   const hours = Math.round(abs / 3600000);
   if (hours < 24) return rtf.format(Math.round(diff / 3600000), "hour");
-  const days = Math.round(abs / 86400000);
+  const  _days = Math.round(abs / 86400000);
   return rtf.format(Math.round(diff / 86400000), "day");
 }

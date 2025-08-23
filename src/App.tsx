@@ -15,7 +15,7 @@ export default function App() {
       setPersonas(data);
       setLoading(false);
       // Autoselect: erstes Modell, falls vorhanden
-      const first = data.flatMap(p => p.models ?? [])[0];
+      const first = data.flatMap((p: any) => p.models ?? [])[0];
       if (first) setSelectedModel(first.id);
     })();
   }, []);

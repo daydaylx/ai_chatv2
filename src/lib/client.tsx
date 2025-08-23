@@ -1,3 +1,4 @@
+/* eslint-disable react-refresh/only-export-components */
 import * as React from "react";
 
 type ClientCtx = { apiKey: string | null; setApiKey: (k: string | null) => void; };

@@ -9,12 +9,12 @@ export function ClientProvider({ children }: { children: React.ReactNode }) {
   const [apiKey, setApiKeyState] = React.useState<string | null>(null);
 
   React.useEffect(() => {
-    try { const v = localStorage.getItem(LS_KEY); if (v) setApiKeyState(v); } catch {}
+    try { const v = localStorage.getItem(LS_KEY); if (v) setApiKeyState(v); } catch { void 0; }
   }, []);
 
   const setApiKey = (k: string | null) => {
     setApiKeyState(k);
-    try { if (!k) localStorage.removeItem(LS_KEY); else localStorage.setItem(LS_KEY, k); } catch {}
+    try { if (!k) localStorage.removeItem(LS_KEY); else localStorage.setItem(LS_KEY, k); } catch { void 0; }
   };
 
   const ctx = React.useMemo<ClientCtx>(() => ({ apiKey, setApiKey }), [apiKey]);

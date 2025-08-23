@@ -13,7 +13,7 @@ const LS_MODEL = "settings.modelId";
 const LS_FAVS = "settings.favorites";
 
 function read(key: string): string | null { try { return localStorage.getItem(key); } catch { return null; } }
-function write(key: string, v: string | null) { try { v==null?localStorage.removeItem(key):localStorage.setItem(key,v);} catch{} }
+function write(key: string, v: string | null) { try { v==null?localStorage.removeItem(key):localStorage.setItem(key,v);} catch { void 0; } }
 
 export const useSettings = create<SettingsState>((set, get) => ({
   modelId: read(LS_MODEL),

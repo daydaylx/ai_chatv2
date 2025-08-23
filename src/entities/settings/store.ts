@@ -1,6 +1,6 @@
-import { create } from "zustand";
+import { create, type StateCreator } from "zustand";
 
-type Settings = {
+export type SettingsState = {
   modelId: string | null;
   summarizerModelId: string | null;
   personaId: string | null;
@@ -16,32 +16,77 @@ type Settings = {
 
 const LS_KEY = "settings_v1";
 
-const load = (): Partial<Settings> => {
-  try { return JSON.parse(localStorage.getItem(LS_KEY) || "{}"); } catch { return {}; }
-};
+function load(): Partial<SettingsState> {
+  try {
+    const raw = localStorage.getItem(LS_KEY);
+    if (!raw) return {};
+    const j = JSON.parse(raw);
+    // Nur die primitiven Felder zulassen
+    return {
+      modelId: j.modelId ?? null,
+      summarizerModelId: j.summarizerModelId ?? null,
+      personaId: j.personaId ?? "neutral",
+      autoSummarize: typeof j.autoSummarize === "boolean" ? j.autoSummarize : true,
+      autoMemory: typeof j.autoMemory === "boolean" ? j.autoMemory : true,
+    };
+  } catch {
+    return {};
+  }
+}
 
-export const useSettings = create<Settings>((set, get) => ({
-  modelId: null,
-  summarizerModelId: null,
-  personaId: "neutral",
-  autoSummarize: true,
-  autoMemory: true,
-
-  setModelId: (id) => { set({ modelId: id }); persist(); },
-  setSummarizerModelId: (id) => { set({ summarizerModelId: id }); persist(); },
-  setPersonaId: (id) => { set({ personaId: id }); persist(); },
-  setAutoSummarize: (v) => { set({ autoSummarize: v }); persist(); },
-  setAutoMemory: (v) => { set({ autoMemory: v }); persist(); },
-  ...load(),
-}));
-
-function persist() {
-  const s = useSettings.getState();
-  localStorage.setItem(LS_KEY, JSON.stringify({
+function persistState(s: SettingsState) {
+  const out = {
     modelId: s.modelId,
     summarizerModelId: s.summarizerModelId,
     personaId: s.personaId,
     autoSummarize: s.autoSummarize,
     autoMemory: s.autoMemory,
-  }));
+  };
+  try { localStorage.setItem(LS_KEY, JSON.stringify(out)); } catch { /* ignore */ }
 }
+
+const initialPrimitives: Omit<SettingsState,
+  "setModelId" | "setSummarizerModelId" | "setPersonaId" | "setAutoSummarize" | "setAutoMemory"
+> = {
+  modelId: null,
+  summarizerModelId: null,
+  personaId: "neutral",
+  autoSummarize: true,
+  autoMemory: true,
+};
+
+const creator: StateCreator<SettingsState, [], [], SettingsState> = (set, get) => {
+  const persisted = load();
+  const base = { ...initialPrimitives, ...persisted };
+
+  return {
+    ...base,
+
+    setModelId: (id: string | null) => {
+      set({ modelId: id });
+      persistState({ ...get(), modelId: id });
+    },
+
+    setSummarizerModelId: (id: string | null) => {
+      set({ summarizerModelId: id });
+      persistState({ ...get(), summarizerModelId: id });
+    },
+
+    setPersonaId: (id: string | null) => {
+      set({ personaId: id });
+      persistState({ ...get(), personaId: id });
+    },
+
+    setAutoSummarize: (v: boolean) => {
+      set({ autoSummarize: v });
+      persistState({ ...get(), autoSummarize: v });
+    },
+
+    setAutoMemory: (v: boolean) => {
+      set({ autoMemory: v });
+      persistState({ ...get(), autoMemory: v });
+    },
+  };
+};
+
+export const useSettings = create<SettingsState>(creator);

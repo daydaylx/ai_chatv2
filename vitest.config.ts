@@ -1,8 +1,9 @@
 import { defineConfig } from 'vitest/config';
-import react from '@vitejs/plugin-react';
+
+// WICHTIG: KEIN @vitejs/plugin-react hier einbinden,
+// sonst kollidieren die Vite-Typen von Vitest & Projekt.
 
 export default defineConfig({
-  plugins: [react()],
   test: {
     environment: 'jsdom',
     css: true,

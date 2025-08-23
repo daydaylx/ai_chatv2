@@ -1,6 +1,7 @@
-// Polyfills / Mocks, falls in Tests benötigt.
+// Minimaler localStorage-Polyfill für Tests
 if (typeof globalThis.localStorage === 'undefined') {
   const store = new Map<string, string>();
+  // @ts-expect-error polyfill
   globalThis.localStorage = {
     getItem: (k: string) => (store.has(k) ? store.get(k)! : null),
     setItem: (k: string, v: string) => { store.set(k, String(v)); },
@@ -8,5 +9,5 @@ if (typeof globalThis.localStorage === 'undefined') {
     clear: () => { store.clear(); },
     key: (i: number) => Array.from(store.keys())[i] ?? null,
     get length() { return store.size; }
-  } as unknown as Storage;
+  };
 }

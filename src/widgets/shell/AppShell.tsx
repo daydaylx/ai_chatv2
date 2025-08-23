@@ -1,31 +1,53 @@
-import * as React from "react";
-import Header from "../../components/Header";
-import SettingsSheet from "../../features/settings/SettingsSheet";
-import SessionDrawer from "../../components/SessionDrawer";
-import { initAccent } from "../../shared/lib/theme";
-import "../../shared/styles/paper.css";
+import React from 'react';
+import Header from '@/components/Header';
+import SessionDrawer from '@/components/SessionDrawer';
 
-export function AppShell({ children }: { children: React.ReactNode }) {
+type Props = {
+  children?: React.ReactNode;
+};
+
+export default function AppShell({ children }: Props) {
   const [openSettings, setOpenSettings] = React.useState(false);
   const [openSessions, setOpenSessions] = React.useState(false);
 
-  React.useEffect(() => { initAccent("amber"); }, []);
-
   return (
-    <div className="relative min-h-[100svh] text-white bg-transparent">
-      {/* Paper-Hintergrund (Spots + Grain) */}
-      <div className="glass-bg" aria-hidden />
-      <div className="glass-noise" aria-hidden />
-
-      {/* Inhalt */}
-      <Header onOpenSettings={() => setOpenSettings(true)} onOpenSessions={() => setOpenSessions(true)} />
-      <main className="relative z-10 mx-auto max-w-screen-sm p-3">
+    <div className="min-h-dvh bg-background text-foreground">
+      <Header
+        onOpenSettings={() => setOpenSettings(true)}
+        onOpenSessions={() => setOpenSessions(true)}
+      />
+      <main className="p-3">
         {children}
       </main>
 
-      {/* Sheets / Drawer */}
-      <SettingsSheet open={openSettings} onOpenChange={setOpenSettings} />
+      {/* Sessions */}
       <SessionDrawer open={openSessions} onOpenChange={setOpenSessions} />
+
+      {/* Settings Placeholder-Panel (falls noch nicht implementiert) */}
+      {openSettings && (
+        <div
+          role="dialog"
+          aria-modal="true"
+          className="fixed inset-0 bg-black/40 flex items-center justify-center"
+          onClick={() => setOpenSettings(false)}
+        >
+          <div
+            className="w-[90vw] max-w-lg rounded-lg border border-border bg-card p-4"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <h2 className="text-lg font-semibold mb-2">Einstellungen</h2>
+            <p className="text-sm text-muted-foreground">Noch nicht konfiguriert.</p>
+            <div className="mt-4 text-right">
+              <button
+                className="px-3 py-2 rounded-md border hover:bg-accent"
+                onClick={() => setOpenSettings(false)}
+              >
+                Schließen
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

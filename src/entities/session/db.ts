@@ -1,98 +1,173 @@
-export type SessionMeta = { id: string; title: string; createdAt: number; updatedAt: number; runningSummary?: string; };
-export type ChatRole = "system" | "user" | "assistant";
-export type Message = { id: string; sessionId: string; role: ChatRole; content: string; createdAt: number; };
-export type MemoryItem = { id: string; text: string; importance: number; updatedAt: number; };
+// Robuster IndexedDB-Layer mit Null-Safety + Memory-Store.
 
-const DB_NAME = "ai_chat_db"; const DB_VER = 1;
+const DB_NAME = 'ai_chat_v2';
+const DB_VERSION = 2;
+
+export type ChatSession = {
+  id: string;
+  title: string;
+  updatedAt: number;
+};
+
+export type ChatMessage = {
+  pk: number;             // Primärschlüssel (auto-increment)
+  sessionId: string;
+  role: 'user' | 'assistant' | 'system';
+  content: string;
+  createdAt: number;
+};
+
+export type MemoryItem = {
+  id?: number;            // auto-increment
+  key: string;            // z.B. sessionId oder global
+  text: string;           // gespeicherter Kontext
+  updatedAt: number;
+  embedding?: number[];   // optional, nicht benötigt
+};
 
 function openDB(): Promise<IDBDatabase> {
   return new Promise((resolve, reject) => {
-    const req = indexedDB.open(DB_NAME, DB_VER);
+    const req = indexedDB.open(DB_NAME, DB_VERSION);
     req.onupgradeneeded = () => {
       const db = req.result;
-      if (!db.objectStoreNames.contains("sessions")) { const s = db.createObjectStore("sessions", { keyPath: "id" }); s.createIndex("updatedAt", "updatedAt"); }
-      if (!db.objectStoreNames.contains("messages")) { const m = db.createObjectStore("messages", { keyPath: "id" }); m.createIndex("sessionId", "sessionId"); m.createIndex("createdAt", "createdAt"); }
-      if (!db.objectStoreNames.contains("memory")) { const mem = db.createObjectStore("memory", { keyPath: "id" }); mem.createIndex("updatedAt", "updatedAt"); }
+
+      if (!db.objectStoreNames.contains('sessions')) {
+        const s = db.createObjectStore('sessions', { keyPath: 'id' });
+        s.createIndex('by_updatedAt', 'updatedAt', { unique: false });
+      }
+
+      if (!db.objectStoreNames.contains('messages')) {
+        const m = db.createObjectStore('messages', { keyPath: 'pk', autoIncrement: true });
+        m.createIndex('by_session', 'sessionId', { unique: false });
+        m.createIndex('by_createdAt', 'createdAt', { unique: false });
+      }
+
+      if (!db.objectStoreNames.contains('memory')) {
+        const mem = db.createObjectStore('memory', { keyPath: 'id', autoIncrement: true });
+        mem.createIndex('by_key', 'key', { unique: false });
+        mem.createIndex('by_updatedAt', 'updatedAt', { unique: false });
+      }
     };
-    req.onsuccess = () => resolve(req.result); req.onerror = () => reject(req.error);
-  });
-}
-async function tx<T>(store: string, mode: IDBTransactionMode, fn: (s: IDBObjectStore) => IDBRequest<T>): Promise<T> {
-  const db = await openDB();
-  return new Promise<T>((resolve, reject) => {
-    const t = db.transaction(store, mode); const s = t.objectStore(store); const rq = fn(s);
-    rq.onsuccess = () => resolve(rq.result as T); rq.onerror = () => reject(rq.error);
+    req.onsuccess = () => resolve(req.result);
+    req.onerror = () => reject(req.error);
   });
 }
 
-export async function putSession(meta: SessionMeta): Promise<void> { await tx("sessions","readwrite",(s)=>s.put(meta) as any); }
-export async function getSession(id: string): Promise<SessionMeta | undefined> { return tx("sessions","readonly",(s)=>s.get(id) as any); }
-export async function listSessions(): Promise<SessionMeta[]> {
-  const db = await openDB();
-  return new Promise((resolve, reject) => {
-    const t = db.transaction("sessions","readonly"); const idx = t.objectStore("sessions").index("updatedAt");
-    const out: SessionMeta[] = []; const rq = idx.openCursor(null,"prev");
-    rq.onsuccess = () => { const cur = rq.result; if (cur) { out.push(cur.value as SessionMeta); cur.continue(); } else resolve(out); };
-    rq.onerror = () => reject(rq.error);
-  });
-}
-export async function deleteSession(id: string): Promise<void> {
-  const db = await openDB();
-  await new Promise<void>((resolve, reject) => {
-    const t = db.transaction(["sessions","messages"],"readwrite");
-    t.objectStore("sessions").delete(id);
-    const idx = t.objectStore("messages").index("sessionId");
-    const rq = idx.openCursor(IDBKeyRange.only(id));
-    rq.onsuccess = () => { const cur = rq.result; if (cur) { t.objectStore("messages").delete(cur.primaryKey as IDBValidKey); cur.continue(); } else resolve(); };
-    rq.onerror = () => reject(rq.error);
-  });
-}
+/* -------- Sessions -------- */
 
-export async function addMessage(m: Message): Promise<void> { await tx("messages","readwrite",(s)=>s.put(m) as any); }
-export async function listMessagesBySession(sessionId: string): Promise<Message[]> {
+export async function listSessions(): Promise<ChatSession[]> {
   const db = await openDB();
   return new Promise((resolve, reject) => {
-    const t = db.transaction("messages","readonly");
-    const idx = t.objectStore("messages").index("sessionId");
-    const rq = idx.openCursor(IDBKeyRange.only(sessionId)); const out: Message[] = [];
-    rq.onsuccess = () => { const cur = rq.result; if (cur) { out.push(cur.value as Message); cur.continue(); } else resolve(out.sort((a,b)=>a.createdAt-b.createdAt)); };
-    rq.onerror = () => reject(rq.error);
-  });
-}
-
-export async function pruneMessages(sessionId: string, keepLastN: number): Promise<number> {
-  const db = await openDB();
-  return new Promise((resolve, reject) => {
-    const t = db.transaction("messages","readwrite");
-    const idx = t.objectStore("messages").index("sessionId");
-    const rq = idx.openCursor(IDBKeyRange.only(sessionId));
-    const list: Array<{ pk: IDBValidKey; createdAt: number }> = [];
-    rq.onsuccess = () => {
-      const cur = rq.result;
-      if (cur) { const v = cur.value as Message; list.push({ pk: cur.primaryKey as IDBValidKey, createdAt: v.createdAt }); cur.continue(); }
-      else { list.sort((a,b)=>a.createdAt-b.createdAt); const toDelete = Math.max(0, list.length - keepLastN);
-        for (let i=0;i<toDelete;i++) t.objectStore("messages").delete(list[i].pk); resolve(toDelete); }
+    const tx = db.transaction('sessions', 'readonly');
+    const store = tx.objectStore('sessions');
+    const out: ChatSession[] = [];
+    const req = store.openCursor();
+    req.onsuccess = () => {
+      const cur = req.result;
+      if (cur) {
+        out.push(cur.value as ChatSession);
+        cur.continue();
+      } else {
+        resolve(out.sort((a, b) => b.updatedAt - a.updatedAt));
+      }
     };
-    rq.onerror = () => reject(rq.error);
+    req.onerror = () => reject(req.error);
   });
 }
 
-export async function upsertMemory(items: MemoryItem[]): Promise<void> {
-  if (!items.length) return;
-  const db = await openDB();
-  await new Promise<void>((resolve, reject) => {
-    const t = db.transaction("memory","readwrite"); const store = t.objectStore("memory");
-    for (const it of items) store.put(it);
-    t.oncomplete = () => resolve(); t.onerror = () => reject(t.error);
-  });
-}
-export async function getAllMemory(): Promise<MemoryItem[]> {
+export async function listMessagesBySession(sessionId: string): Promise<ChatMessage[]> {
   const db = await openDB();
   return new Promise((resolve, reject) => {
-    const t = db.transaction("memory","readonly");
-    const idx = t.objectStore("memory").index("updatedAt");
-    const rq = idx.openCursor(null,"prev"); const out: MemoryItem[] = [];
-    rq.onsuccess = () => { const cur = rq.result; if (cur) { out.push(cur.value as MemoryItem); cur.continue(); } else resolve(out); };
-    rq.onerror = () => reject(rq.error);
+    const tx = db.transaction('messages', 'readonly');
+    const idx = tx.objectStore('messages').index('by_session');
+    const out: ChatMessage[] = [];
+    const req = idx.openCursor(IDBKeyRange.only(sessionId));
+    req.onsuccess = () => {
+      const cur = req.result;
+      if (cur) {
+        out.push(cur.value as ChatMessage);
+        cur.continue();
+      } else {
+        resolve(out.sort((a, b) => a.createdAt - b.createdAt));
+      }
+    };
+    req.onerror = () => reject(req.error);
+  });
+}
+
+/**
+ * Löscht die ältesten Nachrichten einer Session, wenn mehr als maxCount existieren.
+ * Gibt die Anzahl der gelöschten Einträge zurück.
+ */
+export async function pruneOldMessages(sessionId: string, maxCount: number): Promise<number> {
+  const db = await openDB();
+  return new Promise((resolve, reject) => {
+    const tx = db.transaction('messages', 'readwrite');
+    const store = tx.objectStore('messages');
+    const idx = store.index('by_session');
+    const list: ChatMessage[] = [];
+    const req = idx.openCursor(IDBKeyRange.only(sessionId));
+    req.onsuccess = () => {
+      const cur = req.result;
+      if (cur) {
+        list.push(cur.value as ChatMessage);
+        cur.continue();
+      } else {
+        list.sort((a, b) => a.createdAt - b.createdAt);
+        const toDelete = Math.max(0, list.length - maxCount);
+        if (toDelete <= 0) { resolve(0); return; }
+        let deleted = 0;
+        for (let i = 0; i < toDelete; i++) {
+          const item = list[i];
+          if (item && typeof item.pk === 'number') {
+            store.delete(item.pk);
+            deleted++;
+          }
+        }
+        resolve(deleted);
+      }
+    };
+    req.onerror = () => reject(req.error);
+  });
+}
+
+/* -------- Memory -------- */
+
+export async function upsertMemory(item: Omit<MemoryItem, 'id' | 'updatedAt'> & { id?: number }): Promise<number> {
+  const db = await openDB();
+  return new Promise((resolve, reject) => {
+    const tx = db.transaction('memory', 'readwrite');
+    const store = tx.objectStore('memory');
+    const now = Date.now();
+    const data: MemoryItem = { ...item, updatedAt: now };
+    const req = store.put(data);
+    req.onsuccess = () => {
+      const id = (req.result as number) ?? data.id ?? 0;
+      resolve(id);
+    };
+    req.onerror = () => reject(req.error);
+  });
+}
+
+export async function getAllMemory(key?: string): Promise<MemoryItem[]> {
+  const db = await openDB();
+  return new Promise((resolve, reject) => {
+    const tx = db.transaction('memory', 'readonly');
+    const store = tx.objectStore('memory');
+    const out: MemoryItem[] = [];
+    const cursorReq = key
+      ? store.index('by_key').openCursor(IDBKeyRange.only(key))
+      : store.openCursor();
+
+    cursorReq.onsuccess = () => {
+      const cur = cursorReq.result;
+      if (cur) {
+        out.push(cur.value as MemoryItem);
+        cur.continue();
+      } else {
+        resolve(out.sort((a, b) => b.updatedAt - a.updatedAt));
+      }
+    };
+    cursorReq.onerror = () => reject(cursorReq.error);
   });
 }

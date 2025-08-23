@@ -5,16 +5,20 @@
     "module": "ESNext",
     "moduleResolution": "Bundler",
     "jsx": "react-jsx",
+
     "strict": true,
     "noUncheckedIndexedAccess": true,
     "noImplicitOverride": true,
     "verbatimModuleSyntax": true,
+
     "resolveJsonModule": true,
     "baseUrl": ".",
     "paths": {
       "@/*": ["src/*"]
     },
-    "types": ["vite/client"]
+
+    "types": ["vite/client", "vitest/globals"],
+    "skipLibCheck": true
   },
   "include": ["src", "vitest.config.ts"]
 }

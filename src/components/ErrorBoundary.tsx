@@ -1,16 +1,25 @@
-import * as React from "react";
+import React, { Component, type ReactNode } from 'react';
 
-type State = { error: Error | null };
-export class ErrorBoundary extends React.Component<{ children: React.ReactNode }, State> {
-  constructor(props: any) { super(props); this.state = { error: null }; }
-  static getDerivedStateFromError(error: Error) { return { error }; }
-  componentDidCatch(error: Error, info: any) { console.error("UI error:", error, info); }
-  render() {
-    if (this.state.error) {
+type State = { hasError: boolean };
+
+export default class ErrorBoundary extends Component<{ children: ReactNode }, State> {
+  override state: State = { hasError: false };
+
+  // Bei statischen Methoden kein 'override' verwenden.
+  static getDerivedStateFromError(_error: Error): Partial<State> {
+    return { hasError: true };
+  }
+
+  override componentDidCatch(error: Error, info: any) {
+    console.error('UI error:', error, info);
+  }
+
+  override render() {
+    if (this.state.hasError) {
       return (
-        <div className="p-4 m-3 rounded-xl border border-red-500/40 bg-red-500/10">
-          <div className="font-semibold mb-1">Unerwarteter Fehler</div>
-          <div className="text-sm opacity-80">{String(this.state.error.message || this.state.error)}</div>
+        <div className="p-4 rounded-md border bg-card text-foreground">
+          <h2 className="text-lg font-semibold mb-1">Etwas ist schiefgelaufen</h2>
+          <p className="text-sm text-muted-foreground">Bitte Seite neu laden.</p>
         </div>
       );
     }

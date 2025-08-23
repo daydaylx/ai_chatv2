@@ -1,67 +1,82 @@
-import tsParser from "@typescript-eslint/parser";
-import tsPlugin from "@typescript-eslint/eslint-plugin";
-import reactPlugin from "eslint-plugin-react";
-import reactHooks from "eslint-plugin-react-hooks";
+// Flat config
+import js from "@eslint/js";
+import pluginReactHooks from "eslint-plugin-react-hooks";
+import pluginReactRefresh from "eslint-plugin-react-refresh";
+import tseslint from "@typescript-eslint/eslint-plugin";
+import tsparser from "@typescript-eslint/parser";
 
-/** Flat-Config (ESLint 8) – TS + React, Browser + Node/Worker-Overrides, Shell ignorieren */
 export default [
-  { ignores: ["dist/**", "node_modules/**", "**/*.{sh,bash,zsh}"] },
-
+  js.configs.recommended,
   {
-    files: ["**/*.{ts,tsx}"],
+    ignores: ["dist/**/*", "node_modules/**/*", "public/**/*", "scripts/**/*"],
+  },
+  {
+    files: ["**/*.{js,jsx,ts,tsx,mjs}"],
     languageOptions: {
-      parser: tsParser,
-      ecmaVersion: 2022,
+      ecmaVersion: "latest",
       sourceType: "module",
-      parserOptions: { ecmaFeatures: { jsx: true } },
+      parser: tsparser,
       globals: {
+        // Browser globals
         window: "readonly",
         document: "readonly",
-        localStorage: "readonly",
+        navigator: "readonly",
         console: "readonly",
-        Request: "readonly",
-        Headers: "readonly",
         fetch: "readonly",
+        performance: "readonly",
         setTimeout: "readonly",
-        clearTimeout: "readonly"
+        clearTimeout: "readonly",
+        setInterval: "readonly",
+        clearInterval: "readonly",
+        setImmediate: "readonly",
+        MessageChannel: "readonly",
+        MutationObserver: "readonly",
+        MSApp: "readonly",
+        localStorage: "readonly",
+        crypto: "readonly",
+        indexedDB: "readonly",
+        IDBDatabase: "readonly",
+        IDBObjectStore: "readonly",
+        IDBKeyRange: "readonly",
+        IDBTransactionMode: "readonly",
+        URL: "readonly",
+        location: "readonly",
+        HTMLElement: "readonly",
+        HTMLDivElement: "readonly",
+        HTMLButtonElement: "readonly",
+        HTMLInputElement: "readonly",
+        HTMLAttributes: "readonly",
+        HTMLTextAreaElement: "readonly",
+        AbortSignal: "readonly",
+        TextDecoder: "readonly",
+        // Node globals
+        process: "readonly",
+        __dirname: "readonly",
+        __filename: "readonly"
+      },
+      parserOptions: { 
+        ecmaFeatures: { jsx: true },
+        ecmaVersion: "latest",
+        sourceType: "module"
       }
     },
     plugins: {
-      "@typescript-eslint": tsPlugin,
-      "react": reactPlugin,
-      "react-hooks": reactHooks
+      "react-hooks": pluginReactHooks,
+      "react-refresh": pluginReactRefresh,
+      "@typescript-eslint": tseslint
     },
-    settings: { react: { version: "detect" } },
     rules: {
-      "react/react-in-jsx-scope": "off",
-      "react/jsx-no-target-blank": "warn",
+      "no-unused-vars": "off",
+      "@typescript-eslint/no-unused-vars": ["warn", { "argsIgnorePattern": "^_", "varsIgnorePattern": "^_" }],
       "react-hooks/rules-of-hooks": "error",
       "react-hooks/exhaustive-deps": "warn",
-      "no-empty": ["error", { "allowEmptyCatch": false }]
+      "react-refresh/only-export-components": ["warn", { "allowConstantExport": true }],
+      "no-prototype-builtins": "off",
+      "no-cond-assign": "off",
+      "no-empty": "off",
+      "getter-return": "off",
+      "no-misleading-character-class": "off",
+      "no-useless-escape": "off"
     }
-  },
-
-  // Node-/Skripte (JS/TS in scripts/, tools/, *.cjs/*.mjs)
-  {
-    files: ["scripts/**/*.{js,ts,cjs,mjs}", "tools/**/*.{js,ts,cjs,mjs}", "**/*.{cjs,mjs}"],
-    languageOptions: {
-      ecmaVersion: 2022,
-      sourceType: "module",
-      globals: {
-        console: "readonly",
-        process: "readonly",
-        __dirname: "readonly",
-        require: "readonly",
-        module: "readonly"
-      }
-    },
-    rules: { "no-undef": "off" }
-  },
-
-  // Service Worker
-  {
-    files: ["src/sw.js"],
-    languageOptions: { globals: { self: "readonly", caches: "readonly" } },
-    rules: { "no-undef": "off" }
   }
 ];

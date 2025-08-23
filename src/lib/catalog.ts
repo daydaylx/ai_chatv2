@@ -1,4 +1,5 @@
 import * as React from "react";
+<<<<<<< HEAD
 
 /** Modelltyp so definieren, wie SettingsSheet ihn nutzt */
 export type OpenRouterModel = {
@@ -78,19 +79,64 @@ export function useModelCatalog(opts?: UseCatalogOpts): CatalogState {
 
   const [models, setModels] = React.useState<OpenRouterModel[]>(local);
   const [loading, setLoading] = React.useState<boolean>(false);
+=======
+import { fetchModels, type ORModel } from "./openrouter";
+
+export type CatalogModel = {
+  id: string;
+  name?: string;
+  description?: string;
+  tags?: string[];
+  free?: boolean;
+  fast?: boolean;
+  allow_nsfw?: boolean;
+};
+
+export function useModelCatalog({ local, apiKey }: { local: CatalogModel[]; apiKey: string | null; }) {
+  const [models, setModels] = React.useState<CatalogModel[]>(local ?? []);
+  const [loading, setLoading] = React.useState(false);
+>>>>>>> origin/main
   const [error, setError] = React.useState<string | null>(null);
   const [status, setStatus] = React.useState<CatalogStatus>(local.length ? "ready" : "idle");
 
   const abortRef = React.useRef<AbortController | null>(null);
 
+  const normalize = (m: ORModel): CatalogModel => {
+    const id = m.id;
+    const name = m.name ?? m.id;
+    const description = m.description ?? "";
+    const tags = m.tags ?? [];
+    const free = /free|trial|open|test/i.test([id, name, description, tags.join(",")].join(" "));
+    const fast = /fast|turbo|small|mini/i.test([id, name, description, tags.join(",")].join(" "));
+    const allow_nsfw = /nsfw|uncensored|anything/i.test([id, name, description, tags.join(",")].join(" "));
+    return { id, name, description, tags, free, fast, allow_nsfw };
+  };
+
   const load = React.useCallback(async () => {
+<<<<<<< HEAD
     if (!apiKey) {
       setModels(local);
       setError(null);
+=======
+    if (!apiKey) { setModels(local ?? []); setError(null); return; }
+    setLoading(true); setError(null);
+    try {
+      const list = await fetchModels(apiKey);
+      const norm = list.map(normalize);
+      setModels(norm);
+    } catch (e: any) {
+      setError(e?.message ?? "Fehler beim Laden");
+      setModels(local ?? []);
+    } finally {
+>>>>>>> origin/main
       setLoading(false);
       setStatus(local.length ? "ready" : "idle");
       return;
     }
+<<<<<<< HEAD
+=======
+  }, [apiKey, local]);
+>>>>>>> origin/main
 
     abortRef.current?.abort();
     const ac = new AbortController();

@@ -1,18 +1,37 @@
-import * as React from "react";
-import Button from "../shared/ui/Button";
-import { useSettings } from "../entities/settings/store";
+import React from 'react';
+import { useSession } from '../entities/session/store';
 
-export default function Header({ onOpenSettings }: { onOpenSettings: () => void }) {
-  const settings = useSettings();
+type Props = {
+  onOpenSettings?: () => void;
+  onOpenSessions?: () => void;
+};
+
+export default function Header({ onOpenSettings, onOpenSessions }: Props) {
+  const sess = useSession();
+  const title =
+    sess.sessions.find((s) => s.id === sess.currentId)?.title ?? 'Disa AI';
+
   return (
-    <header className="sticky top-0 z-40 bg-[hsl(var(--surface-2))]/95 backdrop-blur border-b border-white/12">
-      <div className="mx-auto max-w-screen-sm px-3 h-12 flex items-center justify-between">
-        <div className="text-sm font-semibold">Disa AI</div>
-        <div className="flex items-center gap-2">
-          <div className="text-xs text-white/70 max-w-[40vw] truncate">{settings.modelId ?? "Modell wählen"}</div>
-          <Button variant="outline" size="sm" onClick={onOpenSettings}>Einstellungen</Button>
-        </div>
+    <header className="h-12 flex items-center justify-between px-3 border-b border-border bg-card">
+      <div className="flex items-center gap-2">
+        <button
+          className="px-2 py-1 rounded-md border hover:bg-accent"
+          onClick={onOpenSessions}
+          aria-label="Sessions öffnen"
+          title="Sessions"
+        >
+          ☰
+        </button>
+        <h1 className="font-semibold truncate">{title}</h1>
       </div>
+      <button
+        className="px-2 py-1 rounded-md border hover:bg-accent"
+        onClick={onOpenSettings}
+        aria-label="Einstellungen"
+        title="Einstellungen"
+      >
+        ⚙
+      </button>
     </header>
   );
 }

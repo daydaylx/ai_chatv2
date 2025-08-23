@@ -1,15 +1,18 @@
 import React from "react";
-import ReactDOM from "react-dom/client";
-import App from "./App";
+import { createRoot } from "react-dom/client";
 import "./styles/globals.css";
+import App from "./App";
+import { ErrorBoundary } from "./components/ErrorBoundary";
 
-const root = document.getElementById("root");
-if (!root) {
-  throw new Error("ROOT element #root fehlt in index.html");
+const rootEl = document.getElementById("root");
+if (!rootEl) {
+  throw new Error("Root element #root not found");
 }
 
-ReactDOM.createRoot(root).render(
+createRoot(rootEl).render(
   <React.StrictMode>
-    <App />
+    <ErrorBoundary>
+      <App />
+    </ErrorBoundary>
   </React.StrictMode>
 );

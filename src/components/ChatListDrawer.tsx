@@ -1,55 +1,56 @@
-import React from "react";
-import { ChatSummary } from "../types";
+import React from 'react';
+import type { ChatSummary } from '../types'; // type-only import
 
-interface Props {
+type Props = {
   open: boolean;
-  chats: ChatSummary[];
-  onClose: () => void;
-  onSelectChat: (id: string) => void;
-  onNewChat: () => void;
-  onOpenSettings: () => void;
-}
+  items: ChatSummary[];
+  onSelect?: (id: string) => void;
+  onClose?: () => void;
+};
 
-export default function ChatListDrawer({
-  open,
-  chats,
-  onClose,
-  onSelectChat,
-  onNewChat,
-  onOpenSettings,
-}: Props) {
+export default function ChatListDrawer({ open, items, onSelect, onClose }: Props) {
   return (
-    <div className={`drawer ${open ? "open" : ""}`} role="dialog" aria-modal="true">
-      <div className="drawer-header">
-        <h2>Deine Chats</h2>
-        <button className="icon-button" aria-label="Schließen" onClick={onClose}>
-          <svg viewBox="0 0 24 24" className="icon">
-            <path d="M6 6l12 12M18 6L6 18" stroke="currentColor" strokeWidth="2" fill="none" strokeLinecap="round"/>
-          </svg>
+    <aside
+      className={`fixed inset-y-0 left-0 w-80 max-w-[85vw] bg-card border-r border-border transition-transform duration-200 ${
+        open ? 'translate-x-0' : '-translate-x-full'
+      }`}
+      aria-hidden={!open}
+      aria-label="Chat Liste"
+    >
+      <div className="h-12 flex items-center justify-between px-3 border-b border-border">
+        <h3 className="font-medium">Chats</h3>
+        <button
+          className="px-2 py-1 rounded-md border hover:bg-accent"
+          onClick={onClose}
+          aria-label="Schließen"
+        >
+          ✕
         </button>
       </div>
-
-      <div className="drawer-content">
-        {chats.length === 0 && (
-          <div className="drawer-empty">Noch keine Konversationen.</div>
+      <div className="overflow-y-auto h-[calc(100%-3rem)]">
+        {items.length === 0 ? (
+          <div className="p-3 text-sm text-muted-foreground">Noch keine Chats.</div>
+        ) : (
+          <ul>
+            {items.map((c) => (
+              <li key={c.id}>
+                <button
+                  className="w-full text-left px-3 py-2 border-b border-border hover:bg-accent"
+                  onClick={() => onSelect?.(c.id)}
+                  title={c.title}
+                >
+                  <div className="truncate">{c.title}</div>
+                  {c.updatedAt ? (
+                    <div className="text-xs text-muted-foreground">
+                      {new Date(c.updatedAt).toLocaleString()}
+                    </div>
+                  ) : null}
+                </button>
+              </li>
+            ))}
+          </ul>
         )}
-
-        <ul className="chat-list">
-          {chats.map((c) => (
-            <li key={c.id}>
-              <button className="chat-item" onClick={() => onSelectChat(c.id)}>
-                <div className="chat-item-title">{c.title}</div>
-                <div className="chat-item-snippet">{c.lastSnippet}</div>
-              </button>
-            </li>
-          ))}
-        </ul>
       </div>
-
-      <div className="drawer-footer">
-        <button className="btn primary" onClick={onNewChat}>+ Neuer Chat</button>
-        <button className="btn" onClick={onOpenSettings}>Einstellungen</button>
-      </div>
-    </div>
+    </aside>
   );
 }

@@ -1,6 +1,0 @@
-[
-  { "id": "openrouter/llama-3.1-8b-instruct:free", "label": "Llama 3.1 8B (free)", "provider": "OpenRouter", "context": 8192 },
-  { "id": "openrouter/mistral-nemo:free", "label": "Mistral Nemo (free)", "provider": "OpenRouter", "context": 8192 },
-  { "id": "openrouter/nous-hermes-2-mixtral-8x7b-dpo:free", "label": "Nous Hermes 2 (Mixtral)", "provider": "OpenRouter", "context": 8192 },
-  { "id": "openrouter/gemma-7b-it:free", "label": "Gemma 7B IT (free)", "provider": "OpenRouter", "context": 8192 }
-]
